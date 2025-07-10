@@ -7,9 +7,11 @@ plugins {
 android {
     namespace = "com.example.spy_android"
     compileSdk = 34
-    targetSdk = 34  // Android 13+ 호환성 필수
-    buildToolsVersion = "34.0.0"
-    ndkVersion = "26.1.10909125"  // 안정된 버전으로 변경
+    ndkVersion = "27.0.12077973"
+
+    buildFeatures {
+        buildConfig = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -22,8 +24,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.spy_android"
-        minSdk = 23 // Android 5.0 이상 지원
-        targetSdk = 34 // 최신 Android 타겟
+        minSdk = 23 // Android 6.0 이상 지원 (권한 시스템 필수)
+        targetSdk = 34 // ← 여기가 올바른 위치!
         versionCode = 1
         versionName = "1.0.0"
 
@@ -40,7 +42,7 @@ android {
 
     signingConfigs {
         create("release") {
-            // 🔥 릴리즈 서명 설정 (실제 배포시에는 보안된 키 사용 필요)
+            // 🔥 릴리즈 서명 설정
             keyAlias = "spy_android_key"
             keyPassword = "secure_password_123"
             storeFile = file("../keystore/spy_android.keystore")
@@ -49,13 +51,13 @@ android {
     }
 
     buildTypes {
-        debug {
+        getByName("debug") {
             isDebuggable = true
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
         }
 
-        release {
+        getByName("release") {
             isDebuggable = false
             isMinifyEnabled = true // ProGuard 코드 난독화 활성화
             isShrinkResources = true // 사용하지 않는 리소스 제거
@@ -114,7 +116,7 @@ flutter {
 
 // 🔥 종속성 추가
 dependencies {
-    implementation("androidx.multidex:multidex:2.0.1")
+    implementation("androidx.multidex:multidx:2.0.1")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("com.google.android.material:material:1.11.0")
 
