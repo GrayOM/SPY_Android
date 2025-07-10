@@ -58,7 +58,8 @@ if [ ! -f "$KEYSTORE_FILE" ]; then
         -keystore "$KEYSTORE_FILE" \
         -alias spy_android_key \
         -keyalg RSA \
-        -keysize 2048 \
+        -keysize 4096 \
+        -sigalg SHA256withRSA \
         -validity 10000 \
         -storepass secure_password_123 \
         -keypass secure_password_123 \

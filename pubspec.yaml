@@ -34,7 +34,7 @@ dependencies:
   package_info_plus: ^8.3.0
 
   # 🔥 버전 충돌 해결: archive를 4.0.7로 업그레이드
-  archive: ^4.0.7
+  archive: ^3.4.10
 
   # 🔥 암호화
   crypto: ^3.0.6
@@ -46,7 +46,7 @@ dependencies:
   workmanager: ^0.5.2
 
   # 🔥 이미지 처리 (archive와 호환되는 버전)
-  image: ^4.5.4
+  image: ^4.1.7
 
   # 🔥 날짜 처리
   intl: ^0.19.0

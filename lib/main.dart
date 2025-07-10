@@ -53,8 +53,14 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // 앱 초기화 로직
-    await TrackingService.initialize();
+    try {
+      // 앱 초기화 로직
+      await TrackingService.initialize();
+      print('App initialized successfully');
+    } catch (e) {
+      print('Initialization error: $e');
+      // 오류가 있어도 앱은 계속 실행
+    }
   }
 
   @override

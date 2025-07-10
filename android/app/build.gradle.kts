@@ -7,7 +7,9 @@ plugins {
 android {
     namespace = "com.example.spy_android"
     compileSdk = 34
-    ndkVersion = "27.0.12077973"
+    targetSdk = 34  // Android 13+ 호환성 필수
+    buildToolsVersion = "34.0.0"
+    ndkVersion = "26.1.10909125"  // 안정된 버전으로 변경
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -20,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.spy_android"
-        minSdk = 21 // Android 5.0 이상 지원
+        minSdk = 23 // Android 5.0 이상 지원
         targetSdk = 34 // 최신 Android 타겟
         versionCode = 1
         versionName = "1.0.0"
