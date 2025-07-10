@@ -1,5 +1,5 @@
 name: spy_android
-description: "Advanced Android Spyware Application"
+description: "System Security Monitoring Application"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -16,54 +16,58 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # 위치 및 권한
-  geolocator: ^14.0.2
-  permission_handler: ^12.0.1
+  geolocator: ^12.0.0
+  permission_handler: ^11.3.1
 
   # 파일 시스템
   path_provider: ^2.1.5
 
   # 네트워크 요청
-  http: ^1.4.0
-  dio: ^5.7.0
+  http: ^1.2.1
+  dio: ^5.4.3+1
 
   # 로컬 저장소
-  shared_preferences: ^2.5.3
+  shared_preferences: ^2.2.3
 
-  # 디바이스 정보
-  device_info_plus: ^11.5.0
-  package_info_plus: ^8.3.0
+  # 디바이스 정보 (호환성 버전)
+  device_info_plus: ^10.1.0
+  package_info_plus: ^8.0.0
 
-  # 🔥 버전 충돌 해결: archive를 4.0.7로 업그레이드
-  archive: ^3.4.10
+  # 암호화
+  crypto: ^3.0.3
 
-  # 🔥 암호화
-  crypto: ^3.0.6
+  # JSON 처리
+  json_annotation: ^4.8.1
 
-  # 🔥 JSON 처리
-  json_annotation: ^4.9.0
-
-  # 🔥 백그라운드 작업
+  # 백그라운드 작업
   workmanager: ^0.5.2
 
-  # 🔥 이미지 처리 (archive와 호환되는 버전)
+  # 이미지 처리
   image: ^4.1.7
 
-  # 🔥 날짜 처리
+  # 날짜 처리
   intl: ^0.19.0
 
-  # 🔥 URL 런처
-  url_launcher: ^6.3.1
+  # URL 런처
+  url_launcher: ^6.2.6
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.14.4
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
 
-  # 🔥 JSON 코드 생성
-  json_serializable: ^6.8.0
-  build_runner: ^2.4.13
+  # JSON 코드 생성
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.9
 
 flutter:
   uses-material-design: true
+
+  # 🔥 네이티브 플러그인 설정
+  plugin:
+    platforms:
+      android:
+        package: com.example.spy_android
+        pluginClass: SpyAndroidPlugin

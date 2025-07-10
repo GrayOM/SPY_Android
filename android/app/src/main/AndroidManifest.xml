@@ -1,70 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.example.spy_android">
 
     <!-- 기본 권한들 -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <!-- 위치 관련 권한 -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
 
-    <!-- SMS 관련 권한 -->
-    <uses-permission android:name="android.permission.READ_SMS"/>
-    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
-    <uses-permission android:name="android.permission.SEND_SMS"/>
-
-    <!-- 통화 관련 권한 -->
-    <uses-permission android:name="android.permission.READ_CALL_LOG"/>
-    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
-    <uses-permission android:name="android.permission.CALL_PHONE"/>
-
-    <!-- 파일 접근 권한 -->
+    <!-- 저장소 권한 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <!-- Android 13+ 필수 권한 -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-
-    <!-- 조건부 권한 -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
 
-    <!-- 연락처 접근 권한 -->
-    <uses-permission android:name="android.permission.READ_CONTACTS"/>
-    <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
+    <!-- Android 13+ 권한 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
 
-    <!-- 카메라 및 마이크 권한 -->
-    <uses-permission android:name="android.permission.CAMERA"/>
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- 민감한 권한들 (선택적) -->
+    <uses-permission android:name="android.permission.READ_SMS"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_CONTACTS"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.CAMERA"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO"
+        tools:node="remove" />
 
-    <!-- 시스템 관련 권한 -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <!-- 백그라운드 서비스 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-
-    <!-- 접근성 서비스 권한 -->
-    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"/>
-
-    <!-- 디바이스 관리자 권한 -->
-    <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN"/>
-
-    <!-- 기타 권한 -->
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/>
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 
     <application
-        android:label="System Service"
+        android:label="System Monitor"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
-        android:hardwareAccelerated="true">
+        android:hardwareAccelerated="true"
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true">
 
         <!-- 메인 액티비티 -->
         <activity
@@ -80,93 +63,41 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
-            <intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="TODO"
+                    tools:ignore="AppLinkUrlError" />
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-
-            <!-- 자동 시작을 위한 인텐트 필터 -->
-            <intent-filter>
-                <action android:name="AUTO_START_TRACKING"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-            </intent-filter>
         </activity>
 
-        <!-- SMS 수신 브로드캐스트 리시버 -->
-        <receiver
-            android:name=".receivers.SmsReceiver"
-            android:exported="true">
-            <intent-filter android:priority="1000">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
-            </intent-filter>
-        </receiver>
-
-        <!-- 부팅 완료 리시버 -->
-        <receiver
-            android:name=".receivers.BootReceiver"
-            android:exported="true">
-            <intent-filter android:priority="1000">
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
-                <action android:name="android.intent.action.PACKAGE_REPLACED"/>
-                <data android:scheme="package"/>
-            </intent-filter>
-        </receiver>
-
-        <!-- 화면 상태 리시버 -->
-        <receiver
-            android:name=".receivers.ScreenStateReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.SCREEN_ON"/>
-                <action android:name="android.intent.action.SCREEN_OFF"/>
-                <action android:name="android.intent.action.USER_PRESENT"/>
-            </intent-filter>
-        </receiver>
-
-        <!-- 접근성 서비스 -->
+        <!-- 백그라운드 서비스 -->
         <service
-            android:name=".services.SpyAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
-        <!-- 백그라운드 추적 서비스 -->
-        <service
-            android:name=".services.BackgroundTrackingService"
+            android:name=".services.BackgroundService"
             android:foregroundServiceType="location"
-            android:exported="false" />
-
-        <!-- 화면 녹화 서비스 -->
-        <service
-            android:name=".services.ScreenRecordingService"
-            android:foregroundServiceType="mediaProjection"
-            android:exported="false" />
-
-        <!-- 파일 모니터링 서비스 -->
-        <service
-            android:name=".services.FileMonitoringService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false" />
+            android:exported="false"
+            tools:ignore="MissingClass" />
 
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-    </application>
 
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-        </intent>
-    </queries>
+        <!-- WorkManager 초기화 -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge"
+            tools:ignore="MissingClass">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+    </application>
 </manifest>
