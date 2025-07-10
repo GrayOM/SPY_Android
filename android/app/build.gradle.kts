@@ -6,8 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.spy_android"
-    compileSdk = 34
-    ndkVersion = "25.1.8937393"
+    compileSdk = 35  // SDK 34로 다운그레이드 (호환성)
+    ndkVersion = "27.0.12077973"  // 안정 버전으로 다운그레이드
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -20,22 +20,13 @@ android {
 
     defaultConfig {
         applicationId = "com.example.spy_android"
-        minSdk = 23 // Android 6.0 이상
-        targetSdk = 34
+        minSdk = 21 // Android 5.0 이상
+        targetSdk = 34  // 다운그레이드
         versionCode = 1
-        versionName = "3.0.0"
+        versionName = "1.0.0"
 
         multiDexEnabled = true
         vectorDrawables.useSupportLibrary = true
-    }
-
-    signingConfigs {
-        create("release") {
-            storeFile = file("../keystore/spy_android.keystore")
-            storePassword = "secure_password_123"
-            keyAlias = "spy_android_key"
-            keyPassword = "secure_password_123"
-        }
     }
 
     buildTypes {
@@ -49,8 +40,6 @@ android {
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
-
-            signingConfig = signingConfigs.getByName("release")
 
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -90,13 +79,12 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("com.google.android.material:material:1.12.0")
-    implementation("androidx.core:core-ktx:1.13.1")
 
     // 네트워크 라이브러리
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // 백그라운드 처리
-    implementation("androidx.lifecycle:lifecycle-service:2.8.4")
-    implementation("androidx.concurrent:concurrent-futures:1.2.0")
+    // 메일 라이브러리 제거 (컴파일 오류 원인)
+    // implementation("com.sun.mail:android-mail:1.6.6")
+    // implementation("com.sun.mail:android-activation:1.6.7")
 }
