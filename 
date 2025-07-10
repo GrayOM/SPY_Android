@@ -1,0 +1,19 @@
+Reapply "develop_v_0_5"
+
+This reverts commit 099f27e31f1cdde1cb3a1dccdc06000a6bd7267f.
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch main
+# Your branch is ahead of 'origin/main' by 1 commit.
+#   (use "git push" to publish your local commits)
+#
+# Changes to be committed:
+#	modified:   android/app/build.gradle.kts
+#	modified:   android/app/src/main/AndroidManifest.xml
+#	modified:   android/app/src/main/kotlin/com/example/spy_android/MainActivity.kt
+#	modified:   android/app/src/main/kotlin/com/example/spy_android/services/BackgroundTrackingService.kt
+#	modified:   lib/services/tracking_service.dart
+#	modified:   pubspec.yaml
+#

