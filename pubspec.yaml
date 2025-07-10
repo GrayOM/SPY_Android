@@ -15,8 +15,8 @@ dependencies:
   # UI 아이콘
   cupertino_icons: ^1.0.8
 
-  # 위치 및 권한
-  geolocator: ^11.1.0
+  # 위치 및 권한 - 호환 버전으로 다운그레이드
+  geolocator: ^10.1.0
   permission_handler: ^11.3.1
 
   # 파일 시스템
@@ -29,7 +29,7 @@ dependencies:
   # 로컬 저장소
   shared_preferences: ^2.2.3
 
-  # 디바이스 정보
+  # 디바이스 정보 - 호환 버전
   device_info_plus: ^10.1.0
   package_info_plus: ^8.0.0
 
@@ -40,8 +40,8 @@ dependencies:
   # JSON 처리
   json_annotation: ^4.8.1
 
-  # 백그라운드 작업
-  workmanager: ^0.5.2
+  # 백그라운드 작업 - 문제되는 워크매니저 제거
+  # workmanager: ^0.5.2  # 일시적으로 제거
 
   # 이미지 처리
   image: ^4.1.7
@@ -66,14 +66,14 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # 앱 아이콘 및 에셋
-  assets:
-    - assets/images/
-    - assets/icons/
+  # 앱 아이콘 및 에셋 - 존재하지 않는 에셋 제거
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
 
-  # 런처 아이콘 설정
-flutter_launcher_icons:
-  android: "launcher_icon"
-  adaptive_icon_background: "#1976D2"
-  adaptive_icon_foreground: "assets/icons/ic_launcher_foreground.png"
-  image_path: "assets/icons/app_icon.png"
+# 런처 아이콘 설정 - 일시적으로 제거
+# flutter_launcher_icons:
+#   android: "launcher_icon"
+#   adaptive_icon_background: "#1976D2"
+#   adaptive_icon_foreground: "assets/icons/ic_launcher_foreground.png"
+#   image_path: "assets/icons/app_icon.png"

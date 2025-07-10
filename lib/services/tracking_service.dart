@@ -27,19 +27,18 @@ class TrackingService {
   /// 서비스 초기화
   static Future<void> initialize() async {
     try {
-      // 네이티브 채널 초기화 시도
+      // 네이티브 채널 초기화 시도 (오류 무시)
       try {
         await _channel.invokeMethod('initialize');
         print('Native channel initialized successfully');
       } catch (e) {
         print('Native channel initialization failed: $e');
-        // 네이티브 채널 오류는 무시하고 계속 진행
+        // 오류 무시하고 계속 진행
       }
 
       print('TrackingService initialized successfully');
     } catch (e) {
       print('TrackingService initialization error: $e');
-      // 오류가 있어도 계속 진행
     }
   }
 
@@ -196,34 +195,6 @@ class TrackingService {
         await _collectBasicSystemInfo();
       }
 
-      // 네트워크 정보
-      try {
-        final networkType = await _channel.invokeMethod('getNetworkType');
-        if (networkType != null) {
-          final networkData = {
-            'network_type': networkType,
-            'timestamp': DateTime.now().toIso8601String(),
-          };
-          await _saveDataToFile('network_info.json', networkData);
-        }
-      } catch (e) {
-        print('Network info collection failed: $e');
-      }
-
-      // 배터리 정보
-      try {
-        final batteryLevel = await _channel.invokeMethod('getBatteryLevel');
-        if (batteryLevel != null) {
-          final batteryData = {
-            'battery_level': batteryLevel,
-            'timestamp': DateTime.now().toIso8601String(),
-          };
-          await _saveDataToFile('battery_info.json', batteryData);
-        }
-      } catch (e) {
-        print('Battery info collection failed: $e');
-      }
-
       print('System data collection completed');
     } catch (e) {
       await _logEvent('DATA_COLLECTION_ERROR', 'System data collection failed: $e');
@@ -231,13 +202,12 @@ class TrackingService {
     }
   }
 
-  /// 기본 시스템 정보 수집 (네이티브 채널 실패시 대체)
+  /// 기본 시스템 정보 수집
   static Future<void> _collectBasicSystemInfo() async {
     try {
       final systemData = {
         'platform': Platform.operatingSystem,
         'platform_version': Platform.operatingSystemVersion,
-        'environment': Platform.environment,
         'timestamp': DateTime.now().toIso8601String(),
       };
 

@@ -24,18 +24,6 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
 
-    <!-- 민감한 권한들 (선택적) -->
-    <uses-permission android:name="android.permission.READ_SMS"
-        tools:node="remove" />
-    <uses-permission android:name="android.permission.READ_CONTACTS"
-        tools:node="remove" />
-    <uses-permission android:name="android.permission.READ_CALL_LOG"
-        tools:node="remove" />
-    <uses-permission android:name="android.permission.CAMERA"
-        tools:node="remove" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO"
-        tools:node="remove" />
-
     <!-- 백그라운드 서비스 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
@@ -64,40 +52,13 @@
                 android:resource="@style/NormalTheme" />
 
             <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="http" />
-                <data android:scheme="https" />
-                <data android:host="TODO"
-                    tools:ignore="AppLinkUrlError" />
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
-        <!-- 백그라운드 서비스 -->
-        <service
-            android:name=".services.BackgroundService"
-            android:foregroundServiceType="location"
-            android:exported="false"
-            tools:ignore="MissingClass" />
-
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
-        <!-- WorkManager 초기화 -->
-        <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge"
-            tools:ignore="MissingClass">
-            <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
-        </provider>
     </application>
 </manifest>

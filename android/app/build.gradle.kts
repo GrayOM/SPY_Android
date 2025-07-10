@@ -6,8 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.spy_android"
-    compileSdk = 34
-    ndkVersion = "25.1.8937393"
+    compileSdk = 35  // SDK 35로 업데이트
+    ndkVersion = "27.0.12077973"  // NDK 27로 업데이트
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -21,7 +21,7 @@ android {
     defaultConfig {
         applicationId = "com.example.spy_android"
         minSdk = 21 // Android 5.0 이상
-        targetSdk = 34
+        targetSdk = 35  // 업데이트
         versionCode = 1
         versionName = "1.0.0"
 
@@ -78,7 +78,7 @@ flutter {
 dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
-    implementation("com.google.android.material:material:1.11.0")
+    implementation("com.google.android.material:material:1.12.0")
 
     // 네트워크 라이브러리
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

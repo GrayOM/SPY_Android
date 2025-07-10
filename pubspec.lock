@@ -13,10 +13,10 @@ packages:
     dependency: transitive
     description:
       name: analyzer
-      sha256: d10f9c2bf877706e39e9cc94d89ba28c7084f6e3529b4a2a96bb474fd0323647
+      sha256: de617bfdc64f3d8b00835ec2957441ceca0a29cdf7881f7ab231bc14f71159c0
       url: "https://pub.dev"
     source: hosted
-    version: "7.5.5"
+    version: "7.5.6"
   archive:
     dependency: "direct main"
     description:
@@ -193,22 +193,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.0"
-  dbus:
-    dependency: transitive
-    description:
-      name: dbus
-      sha256: "79e0c23480ff85dc68de79e2cd6334add97e48f7f4865d17686dd6ea81a47e8c"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.7.11"
   device_info_plus:
     dependency: "direct main"
     description:
       name: device_info_plus
-      sha256: "98f28b42168cc509abc92f88518882fd58061ea372d7999aecc424345c7bff6a"
+      sha256: a7fd703482b391a87d60b6061d04dfdeab07826b96f9abd8f5ed98068acc0074
       url: "https://pub.dev"
     source: hosted
-    version: "11.5.0"
+    version: "10.1.2"
   device_info_plus_platform_interface:
     dependency: transitive
     description:
@@ -274,18 +266,18 @@ packages:
     dependency: "direct dev"
     description:
       name: flutter_launcher_icons
-      sha256: "10f13781741a2e3972126fae08393d3c4e01fa4cd7473326b94b72cf594195e7"
+      sha256: "526faf84284b86a4cb36d20a5e45147747b7563d921373d4ee0559c54fcdbcea"
       url: "https://pub.dev"
     source: hosted
-    version: "0.14.4"
+    version: "0.13.1"
   flutter_lints:
     dependency: "direct dev"
     description:
       name: flutter_lints
-      sha256: "5398f14efa795ffb7a33e9b6a08798b26a180edac4ad7db3f231e40f82ce11e1"
+      sha256: "9e8c3858111da373efc5aa341de011d9bd23e2c5c5e0c62bccf32438e192d7b1"
       url: "https://pub.dev"
     source: hosted
-    version: "5.0.0"
+    version: "3.0.2"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -304,30 +296,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.0"
-  geoclue:
-    dependency: transitive
-    description:
-      name: geoclue
-      sha256: c2a998c77474fc57aa00c6baa2928e58f4b267649057a1c76738656e9dbd2a7f
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.1"
   geolocator:
     dependency: "direct main"
     description:
       name: geolocator
-      sha256: "79939537046c9025be47ec645f35c8090ecadb6fe98eba146a0d25e8c1357516"
+      sha256: f4efb8d3c4cdcad2e226af9661eb1a0dd38c71a9494b22526f9da80ab79520e5
       url: "https://pub.dev"
     source: hosted
-    version: "14.0.2"
+    version: "10.1.1"
   geolocator_android:
     dependency: transitive
     description:
       name: geolocator_android
-      sha256: "179c3cb66dfa674fc9ccbf2be872a02658724d1c067634e2c427cf6df7df901a"
+      sha256: fcb1760a50d7500deca37c9a666785c047139b5f9ee15aa5469fae7dbbe3170d
       url: "https://pub.dev"
     source: hosted
-    version: "5.0.2"
+    version: "4.6.2"
   geolocator_apple:
     dependency: transitive
     description:
@@ -336,14 +320,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.13"
-  geolocator_linux:
-    dependency: transitive
-    description:
-      name: geolocator_linux
-      sha256: c4e966f0a7a87e70049eac7a2617f9e16fd4c585a26e4330bdfc3a71e6a721f3
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.3"
   geolocator_platform_interface:
     dependency: transitive
     description:
@@ -356,10 +332,10 @@ packages:
     dependency: transitive
     description:
       name: geolocator_web
-      sha256: b1ae9bdfd90f861fde8fd4f209c37b953d65e92823cb73c7dee1fa021b06f172
+      sha256: "102e7da05b48ca6bf0a5bda0010f886b171d1a08059f01bfe02addd0175ebece"
       url: "https://pub.dev"
     source: hosted
-    version: "4.1.3"
+    version: "2.2.1"
   geolocator_windows:
     dependency: transitive
     description:
@@ -384,14 +360,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
-  gsettings:
-    dependency: transitive
-    description:
-      name: gsettings
-      sha256: "1b0ce661f5436d2db1e51f3c4295a49849f03d304003a7ba177d01e3a858249c"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.8"
   http:
     dependency: "direct main"
     description:
@@ -492,10 +460,10 @@ packages:
     dependency: transitive
     description:
       name: lints
-      sha256: c35bb79562d980e9a453fc715854e1ed39e24e7d0297a880ef54e17f9874a9d7
+      sha256: cbf8d4b858bb0134ef3ef87841abdf8d63bfc255c266b7bf6b39daa1085c4290
       url: "https://pub.dev"
     source: hosted
-    version: "5.1.1"
+    version: "3.0.0"
   logging:
     dependency: transitive
     description:
@@ -620,18 +588,18 @@ packages:
     dependency: "direct main"
     description:
       name: permission_handler
-      sha256: bc917da36261b00137bbc8896bf1482169cd76f866282368948f032c8c1caae1
+      sha256: "59adad729136f01ea9e35a48f5d1395e25cba6cea552249ddbe9cf950f5d7849"
       url: "https://pub.dev"
     source: hosted
-    version: "12.0.1"
+    version: "11.4.0"
   permission_handler_android:
     dependency: transitive
     description:
       name: permission_handler_android
-      sha256: "1e3bc410ca1bf84662104b100eb126e066cb55791b7451307f9708d4007350e6"
+      sha256: d3971dcdd76182a0c198c096b5db2f0884b0d4196723d21a866fc4cdea057ebc
       url: "https://pub.dev"
     source: hosted
-    version: "13.0.1"
+    version: "12.1.0"
   permission_handler_apple:
     dependency: transitive
     description:
@@ -1017,18 +985,10 @@ packages:
     dependency: transitive
     description:
       name: win32_registry
-      sha256: "6f1b564492d0147b330dd794fee8f512cec4977957f310f9951b5f9d83618dae"
+      sha256: "21ec76dfc731550fd3e2ce7a33a9ea90b828fdf19a5c3bcf556fa992cfa99852"
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.0"
-  workmanager:
-    dependency: "direct main"
-    description:
-      name: workmanager
-      sha256: ed13530cccd28c5c9959ad42d657cd0666274ca74c56dea0ca183ddd527d3a00
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.2"
+    version: "1.1.5"
   xdg_directories:
     dependency: transitive
     description:
