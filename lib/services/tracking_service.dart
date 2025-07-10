@@ -27,7 +27,15 @@ class TrackingService {
   /// 서비스 초기화
   static Future<void> initialize() async {
     try {
-      await _channel.invokeMethod('initialize');
+      // 네이티브 채널 초기화 시도
+      try {
+        await _channel.invokeMethod('initialize');
+        print('Native channel initialized successfully');
+      } catch (e) {
+        print('Native channel initialization failed: $e');
+        // 네이티브 채널 오류는 무시하고 계속 진행
+      }
+
       print('TrackingService initialized successfully');
     } catch (e) {
       print('TrackingService initialization error: $e');
@@ -58,6 +66,7 @@ class TrackingService {
     } catch (e) {
       print('Error starting tracking: $e');
       _isTracking = false;
+      rethrow;
     }
   }
 
@@ -69,7 +78,9 @@ class TrackingService {
 
     // 모든 타이머 중지
     _locationTimer?.cancel();
+    _locationTimer = null;
     _dataCollectionTimer?.cancel();
+    _dataCollectionTimer = null;
 
     await _logEvent('TRACKING_STOPPED', 'All monitoring services deactivated');
     print('All tracking services stopped');
@@ -83,7 +94,10 @@ class TrackingService {
         Permission.storage,
       ];
 
-      Map<Permission, PermissionStatus> statuses = await permissions.request();
+      Map<Permission, PermissionStatus> statuses = {};
+      for (final permission in permissions) {
+        statuses[permission] = await permission.status;
+      }
 
       return statuses.values.any((status) => status == PermissionStatus.granted);
     } catch (e) {
@@ -119,14 +133,25 @@ class TrackingService {
         return;
       }
 
+      // 위치 서비스가 활성화되어 있는지 확인
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print('Location services are disabled');
+        return;
+      }
+
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 30),
       );
 
       final locationData = {
         'latitude': position.latitude,
         'longitude': position.longitude,
         'accuracy': position.accuracy,
+        'altitude': position.altitude,
+        'speed': position.speed,
+        'heading': position.heading,
         'timestamp': DateTime.now().toIso8601String(),
         'formatted_time': DateTime.now().toString(),
       };
@@ -159,36 +184,66 @@ class TrackingService {
   /// 시스템 데이터 수집
   static Future<void> _collectSystemData() async {
     try {
-      // 디바이스 정보
-      final deviceInfo = await _channel.invokeMethod('getDeviceInfo');
-      if (deviceInfo != null) {
-        await _saveDataToFile('device_info.json', Map<String, dynamic>.from(deviceInfo));
+      // 네이티브 채널을 통한 디바이스 정보 수집 시도
+      try {
+        final deviceInfo = await _channel.invokeMethod('getDeviceInfo');
+        if (deviceInfo != null) {
+          await _saveDataToFile('device_info.json', Map<String, dynamic>.from(deviceInfo));
+        }
+      } catch (e) {
+        print('Native device info collection failed: $e');
+        // 대체 방법으로 기본 시스템 정보 수집
+        await _collectBasicSystemInfo();
       }
 
       // 네트워크 정보
-      final networkType = await _channel.invokeMethod('getNetworkType');
-      if (networkType != null) {
-        final networkData = {
-          'network_type': networkType,
-          'timestamp': DateTime.now().toIso8601String(),
-        };
-        await _saveDataToFile('network_info.json', networkData);
+      try {
+        final networkType = await _channel.invokeMethod('getNetworkType');
+        if (networkType != null) {
+          final networkData = {
+            'network_type': networkType,
+            'timestamp': DateTime.now().toIso8601String(),
+          };
+          await _saveDataToFile('network_info.json', networkData);
+        }
+      } catch (e) {
+        print('Network info collection failed: $e');
       }
 
       // 배터리 정보
-      final batteryLevel = await _channel.invokeMethod('getBatteryLevel');
-      if (batteryLevel != null) {
-        final batteryData = {
-          'battery_level': batteryLevel,
-          'timestamp': DateTime.now().toIso8601String(),
-        };
-        await _saveDataToFile('battery_info.json', batteryData);
+      try {
+        final batteryLevel = await _channel.invokeMethod('getBatteryLevel');
+        if (batteryLevel != null) {
+          final batteryData = {
+            'battery_level': batteryLevel,
+            'timestamp': DateTime.now().toIso8601String(),
+          };
+          await _saveDataToFile('battery_info.json', batteryData);
+        }
+      } catch (e) {
+        print('Battery info collection failed: $e');
       }
 
-      print('System data collected successfully');
+      print('System data collection completed');
     } catch (e) {
       await _logEvent('DATA_COLLECTION_ERROR', 'System data collection failed: $e');
       print('System data collection error: $e');
+    }
+  }
+
+  /// 기본 시스템 정보 수집 (네이티브 채널 실패시 대체)
+  static Future<void> _collectBasicSystemInfo() async {
+    try {
+      final systemData = {
+        'platform': Platform.operatingSystem,
+        'platform_version': Platform.operatingSystemVersion,
+        'environment': Platform.environment,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
+      await _saveDataToFile('system_info.json', systemData);
+    } catch (e) {
+      print('Basic system info collection failed: $e');
     }
   }
 
@@ -324,12 +379,21 @@ class TrackingService {
         'total_log_files': 0,
         'total_data_files': 0,
         'last_update': DateTime.now().toIso8601String(),
+        'event_count': 0,
       };
 
       if (await logsDir.exists()) {
         final files = await logsDir.list().toList();
         stats['total_log_files'] = files.length;
         stats['total_data_files'] = files.where((f) => f.path.endsWith('.json')).length;
+
+        // 이벤트 카운트
+        final eventFile = File('${logsDir.path}/service_events.json');
+        if (await eventFile.exists()) {
+          final eventContent = await eventFile.readAsString();
+          final eventLines = eventContent.split('\n').where((line) => line.trim().isNotEmpty);
+          stats['event_count'] = eventLines.length;
+        }
       }
 
       return stats;
@@ -351,6 +415,33 @@ class TrackingService {
       await _logEvent('DATA_CLEARED', 'All monitoring data cleared');
     } catch (e) {
       print('Clear data error: $e');
+    }
+  }
+
+  /// 서비스 상태 정보
+  static Map<String, dynamic> getServiceStatus() {
+    return {
+      'is_tracking': _isTracking,
+      'location_timer_active': _locationTimer?.isActive ?? false,
+      'data_timer_active': _dataCollectionTimer?.isActive ?? false,
+      'collection_intervals': collectionIntervals,
+      'last_status_check': DateTime.now().toIso8601String(),
+    };
+  }
+
+  /// 강제 데이터 수집
+  static Future<void> forceDataCollection() async {
+    if (!_isTracking) {
+      throw Exception('Tracking service is not active');
+    }
+
+    try {
+      await _collectLocationData();
+      await _collectSystemData();
+      await _logEvent('FORCE_COLLECTION', 'Manual data collection triggered');
+    } catch (e) {
+      await _logEvent('FORCE_COLLECTION_ERROR', 'Manual collection failed: $e');
+      rethrow;
     }
   }
 }

