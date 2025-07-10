@@ -6,8 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.spy_android"
-    compileSdk = 35  // SDK 35로 업데이트
-    ndkVersion = "27.0.12077973"  // NDK 27로 업데이트
+    compileSdk = 35  // SDK 34로 다운그레이드 (호환성)
+    ndkVersion = "27.0.12077973"  // 안정 버전으로 다운그레이드
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -21,7 +21,7 @@ android {
     defaultConfig {
         applicationId = "com.example.spy_android"
         minSdk = 21 // Android 5.0 이상
-        targetSdk = 35  // 업데이트
+        targetSdk = 34  // 다운그레이드
         versionCode = 1
         versionName = "1.0.0"
 
@@ -83,4 +83,8 @@ dependencies {
     // 네트워크 라이브러리
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // 메일 라이브러리 제거 (컴파일 오류 원인)
+    // implementation("com.sun.mail:android-mail:1.6.6")
+    // implementation("com.sun.mail:android-activation:1.6.7")
 }
