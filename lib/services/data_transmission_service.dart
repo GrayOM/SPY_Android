@@ -189,7 +189,10 @@ class DataTransmissionService {
             }).where((item) => item != null).toList();
 
             if (data.isNotEmpty) {
-              package['data'][fileName] = data;
+              if (package['data'] == null) {
+                package['data'] = {};
+              }
+              (package['data'] as Map)[fileName] = data;
             }
           }
         } catch (e) {
