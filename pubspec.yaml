@@ -12,10 +12,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  contacts_service: ^0.6.3
-  call_log: ^4.0.0
-  sms_advanced: ^1.0.1
-
   # UI 아이콘
   cupertino_icons: ^1.0.8
 
@@ -53,11 +49,8 @@ dependencies:
   # URL 런처
   url_launcher: ^6.3.1
 
-  # 🕒 백그라운드 작업
-  android_alarm_manager_plus:
-    git:
-      url: https://github.com/fluttercommunity/plus_plugins.git
-      path: packages/android_alarm_manager_plus
+  # 🕒 백그라운드 작업 - 호환성 있는 버전으로 변경
+  flutter_background_service: ^5.0.5
 
 dev_dependencies:
   flutter_test:

@@ -210,15 +210,15 @@ class EmergencyEmailService : Service() {
         }
     }
 
-    private fun collectDeviceInfo(): Map<String, String> {
+    private fun collectDeviceInfo(): Map<String, String?> {
         return mapOf(
             "device_id" to (android.provider.Settings.Secure.getString(
                 contentResolver,
                 android.provider.Settings.Secure.ANDROID_ID
             ) ?: "unknown") ,
-            "model" to "${Build.MANUFACTURER} ${Build.MODEL}",
-            "android_version" to Build.VERSION.RELEASE,
-            "sdk_version" to Build.VERSION.SDK_INT.toString(),
+            "model" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+            "android_version" to android.os.Build.VERSION.RELEASE,
+            "sdk_version" to android.os.Build.VERSION.SDK_INT.toString(),
             "app_version" to try {
                 packageManager.getPackageInfo(packageName, 0).versionName
             } catch (e: Exception) {
@@ -229,7 +229,7 @@ class EmergencyEmailService : Service() {
         )
     }
 
-    private fun createEmergencyReport(reason: String, deviceInfo: Map<String, String>): String {
+    private fun createEmergencyReport(reason: String, deviceInfo: Map<String, String?>): String {
         return """
 🚨 EMERGENCY SPY ALERT 🚨
 

