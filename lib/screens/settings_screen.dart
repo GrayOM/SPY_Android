@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../services/tracking_service.dart';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -13,7 +15,11 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _endpointsController = TextEditingController();
+
   PermissionStatus? _locationStatus;
+  PermissionStatus? _backgroundLocationStatus;
+  PermissionStatus? _galleryStatus;
   PackageInfo? _packageInfo;
   Map<String, Object?> _deviceInfo = {};
   bool _isLoading = true;
@@ -24,27 +30,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _endpointsController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
     final results = await Future.wait<Object?>([
       Permission.locationWhenInUse.status,
+      Permission.locationAlways.status,
+      Platform.isAndroid ? Permission.photos.status : Permission.storage.status,
       PackageInfo.fromPlatform(),
       _loadDeviceInfo(),
+      TrackingService.getBackendEndpoints(),
     ]);
 
     if (!mounted) return;
     setState(() {
       _locationStatus = results[0] as PermissionStatus;
-      _packageInfo = results[1] as PackageInfo;
-      _deviceInfo = results[2] as Map<String, Object?>;
+      _backgroundLocationStatus = results[1] as PermissionStatus;
+      _galleryStatus = results[2] as PermissionStatus;
+      _packageInfo = results[3] as PackageInfo;
+      _deviceInfo = results[4] as Map<String, Object?>;
+      _endpointsController.text = (results[5] as List<String>).join('\n');
       _isLoading = false;
     });
   }
 
   Future<Map<String, Object?>> _loadDeviceInfo() async {
     if (!Platform.isAndroid) {
-      return {'platform': Platform.operatingSystem};
+      return {'Platform': Platform.operatingSystem};
     }
 
     final androidInfo = await DeviceInfoPlugin().androidInfo;
@@ -54,42 +72,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'Manufacturer': androidInfo.manufacturer,
       'Android Version': androidInfo.version.release,
       'SDK Version': androidInfo.version.sdkInt,
-      'Physical Device': androidInfo.isPhysicalDevice ? 'Yes' : 'No',
     };
   }
 
-  Future<void> _requestLocationPermission() async {
-    final status = await Permission.locationWhenInUse.request();
+  Future<void> _saveEndpoints() async {
+    await TrackingService.saveBackendEndpoints(_endpointsController.text);
     if (!mounted) return;
-    setState(() => _locationStatus = status);
-
-    if (status.isPermanentlyDenied) {
-      _showSettingsDialog();
-    }
-  }
-
-  void _showSettingsDialog() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Open Settings'),
-        content: const Text(
-          'Location permission has been permanently denied. Enable it in Android settings to use monitoring.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              openAppSettings();
-            },
-            child: const Text('Open Settings'),
-          ),
-        ],
-      ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Backend endpoints saved')),
     );
   }
 
@@ -97,13 +87,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (status == null) return 'Unknown';
     if (status.isGranted) return 'Granted';
     if (status.isLimited) return 'Limited';
-    if (status.isPermanentlyDenied) return 'Permanently denied';
+    if (status.isPermanentlyDenied) return 'Denied in settings';
     if (status.isRestricted) return 'Restricted';
     return 'Denied';
   }
 
   Color _permissionColor(PermissionStatus? status) {
-    if (status?.isGranted == true) return Colors.green;
+    if (status?.isGranted == true || status?.isLimited == true) return Colors.green;
     if (status?.isPermanentlyDenied == true) return Colors.red;
     return Colors.orange;
   }
@@ -123,10 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Icon(icon),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 12),
@@ -134,6 +121,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPermissionTile(String title, PermissionStatus? status) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(Icons.verified_user_outlined, color: _permissionColor(status)),
+      title: Text(title),
+      subtitle: Text(_permissionText(status)),
     );
   }
 
@@ -157,23 +153,76 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   _buildSection(
-                    title: 'Permissions',
+                    title: 'Permission Dashboard',
                     icon: Icons.security,
                     children: [
+                      _buildPermissionTile('Location while app is in use', _locationStatus),
+                      _buildPermissionTile('Background location', _backgroundLocationStatus),
+                      _buildPermissionTile('Gallery', _galleryStatus),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: openAppSettings,
+                          icon: const Icon(Icons.settings_applications),
+                          label: const Text('Open Android Settings'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSection(
+                    title: 'Guardian Backend Points',
+                    icon: Icons.cloud_upload_outlined,
+                    children: [
+                      TextField(
+                        controller: _endpointsController,
+                        minLines: 3,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'HTTPS endpoints',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      FilledButton.icon(
+                        onPressed: _saveEndpoints,
+                        icon: const Icon(Icons.save_outlined),
+                        label: const Text('Save Endpoints'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSection(
+                    title: 'Conservation Policy',
+                    icon: Icons.privacy_tip_outlined,
+                    children: const [
                       ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          Icons.location_on_outlined,
-                          color: _permissionColor(_locationStatus),
-                        ),
-                        title: const Text('Location while app is in use'),
-                        subtitle: Text(_permissionText(_locationStatus)),
-                        trailing: _locationStatus?.isGranted == true
-                            ? const Icon(Icons.check_circle, color: Colors.green)
-                            : FilledButton(
-                                onPressed: _requestLocationPermission,
-                                child: const Text('Grant'),
-                              ),
+                        title: Text('Location'),
+                        subtitle: Text('Latest samples are stored locally and sent only to configured backend points after consent.'),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('Protected information'),
+                        subtitle: Text('Saved values are encrypted on this device. The web admin page does not display plaintext.'),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('Excluded data'),
+                        subtitle: Text('No camera, microphone, SMS, calls, contacts, screen content, accessibility, device manager, app-list, or overlay capture.'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSection(
+                    title: 'Local Guardian Web Page',
+                    icon: Icons.language_outlined,
+                    children: [
+                      _buildInfoTile(
+                        'Address',
+                        TrackingService.guardianAdminPort == null
+                            ? 'Starts when sharing is on'
+                            : 'http://device-ip:${TrackingService.guardianAdminPort}',
                       ),
                     ],
                   ),
@@ -185,10 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (_packageInfo != null) ...[
                         _buildInfoTile('App Name', _packageInfo!.appName),
                         _buildInfoTile('Package Name', _packageInfo!.packageName),
-                        _buildInfoTile(
-                          'Version',
-                          '${_packageInfo!.version} (${_packageInfo!.buildNumber})',
-                        ),
+                        _buildInfoTile('Version', '${_packageInfo!.version} (${_packageInfo!.buildNumber})'),
                       ],
                     ],
                   ),
@@ -199,20 +245,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: _deviceInfo.entries
                         .map((entry) => _buildInfoTile(entry.key, entry.value))
                         .toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSection(
-                    title: 'System Settings',
-                    icon: Icons.tune,
-                    children: [
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.settings_applications),
-                        title: const Text('Open App Settings'),
-                        subtitle: const Text('Manage app permissions in Android'),
-                        onTap: openAppSettings,
-                      ),
-                    ],
                   ),
                 ],
               ),

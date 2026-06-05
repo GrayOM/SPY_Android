@@ -1,14 +1,32 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/logs_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/tracking_service.dart';
 
-void main() {
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (task == TrackingService.backgroundLocationTask) {
+      return TrackingService.runBackgroundLocationShare();
+    }
+    return true;
+  });
+}
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Workmanager().initialize(callbackDispatcher);
+  } on MissingPluginException {
+    debugPrint('Workmanager plugin unavailable; foreground sharing remains available.');
+  }
   runApp(const ShadowTrackApp());
 }
 
@@ -18,10 +36,10 @@ class ShadowTrackApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Device Monitor',
+      title: 'Android_helper',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
       ),
       home: const MainScreen(),
@@ -77,7 +95,7 @@ class _MainScreenState extends State<MainScreen> {
           NavigationDestination(
             icon: Icon(Icons.list_alt_outlined),
             selectedIcon: Icon(Icons.list_alt),
-            label: 'Logs',
+            label: 'Admin',
           ),
         ],
       ),

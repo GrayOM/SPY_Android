@@ -21,7 +21,7 @@ class _LogsScreenState extends State<LogsScreen>
   bool _isLoading = true;
   String _selectedFilter = 'All';
 
-  static const _filters = ['All', 'Location', 'Diagnostics', 'Events'];
+  static const _filters = ['All', 'Location', 'Events'];
 
   @override
   void initState() {
@@ -65,8 +65,6 @@ class _LogsScreenState extends State<LogsScreen>
       switch (_selectedFilter) {
         case 'Location':
           return source == 'location_data.json' || log.containsKey('latitude');
-        case 'Diagnostics':
-          return source == 'diagnostics.json';
         case 'Events':
           return log.containsKey('event');
         default:
@@ -87,7 +85,7 @@ class _LogsScreenState extends State<LogsScreen>
       builder: (context) => AlertDialog(
         title: const Text('Clear Logs'),
         content: const Text(
-          'Delete all locally stored monitoring records? This cannot be undone.',
+          'Delete locally stored sharing records? This cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -152,7 +150,6 @@ class _LogsScreenState extends State<LogsScreen>
 
     final source = log['source_file']?.toString();
     if (source == 'location_data.json') return 'Location sample';
-    if (source == 'diagnostics.json') return 'Diagnostics sample';
     return 'Log record';
   }
 
@@ -166,16 +163,12 @@ class _LogsScreenState extends State<LogsScreen>
       return 'Lat: ${latitude.toStringAsFixed(4)}, Lng: ${longitude.toStringAsFixed(4)}';
     }
 
-    final platform = log['platform']?.toString();
-    if (platform != null) return 'Platform: $platform';
-
     return 'Tap to view details';
   }
 
   IconData _getLogIcon(Map<String, dynamic> log) {
     final source = log['source_file']?.toString();
     if (source == 'location_data.json') return Icons.location_on_outlined;
-    if (source == 'diagnostics.json') return Icons.phone_android_outlined;
     if (log.containsKey('event')) return Icons.event_note_outlined;
     return Icons.info_outline;
   }
@@ -210,7 +203,7 @@ class _LogsScreenState extends State<LogsScreen>
           children: [
             Icon(Icons.inbox_outlined, size: 56),
             SizedBox(height: 12),
-            Text('No logs available'),
+            Text('No timeline records available'),
           ],
         ),
       );
@@ -319,10 +312,9 @@ class _LogsScreenState extends State<LogsScreen>
                   const SizedBox(height: 12),
                   _buildStatRow('Total Records', _stats['total_records']),
                   _buildStatRow('Locations', _stats['location_count']),
-                  _buildStatRow('Diagnostics', _stats['diagnostics_count']),
                   _buildStatRow('Events', _stats['event_count']),
                   _buildStatRow('Data Files', _stats['total_data_files']),
-                  _buildStatRow('Tracking Active',
+                  _buildStatRow('Sharing Active',
                       TrackingService.isTracking ? 'Yes' : 'No'),
                 ],
               ),
@@ -353,7 +345,7 @@ class _LogsScreenState extends State<LogsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Activity Logs'),
+        title: const Text('Guardian Admin'),
         actions: [
           IconButton(
             onPressed: _loadData,
@@ -374,7 +366,7 @@ class _LogsScreenState extends State<LogsScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(icon: Icon(Icons.list_alt), text: 'Logs'),
+            Tab(icon: Icon(Icons.list_alt), text: 'Timeline'),
             Tab(icon: Icon(Icons.location_on), text: 'Location'),
             Tab(icon: Icon(Icons.analytics), text: 'Stats'),
           ],
