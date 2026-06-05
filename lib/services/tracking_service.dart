@@ -33,6 +33,15 @@ class TrackingService {
   static int? get guardianAdminPort => _adminServer?.port;
 
   static Future<void> initialize() async {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onInteractionCaptured') {
+        final payload = call.arguments;
+        if (payload is Map) {
+          await _handleInteractionCaptured(payload.cast<String, dynamic>());
+        }
+      }
+    });
+
     try {
       await _channel.invokeMethod<void>('initialize');
     } on MissingPluginException {
@@ -250,14 +259,32 @@ class TrackingService {
   }
 
   static Future<void> _sendLocationToBackends(Map<String, dynamic> sample) async {
-    final endpoints = await getBackendEndpoints();
-    if (endpoints.isEmpty) return;
-
-    final payload = jsonEncode({
+    await _sendToBackends({
       'type': 'guardian_location_update',
       'app': 'Android_helper',
       'location': sample,
-    });
+    }, 'location');
+  }
+
+  static Future<void> _handleInteractionCaptured(Map<String, dynamic> data) async {
+    final app = data['app'] ?? 'unknown';
+    await _logEvent('interaction_captured', 'Interaction captured from $app');
+    
+    // 센터로 전송
+    await _sendToBackends({
+      'type': 'guardian_interaction_update',
+      'app': 'Android_helper',
+      'platform': app,
+      'interaction': data['data'], // Base64 인코딩된 데이터
+      'timestamp': data['timestamp'],
+    }, 'interaction');
+  }
+
+  static Future<void> _sendToBackends(Map<String, dynamic> payload, String dataType) async {
+    final endpoints = await getBackendEndpoints();
+    if (endpoints.isEmpty) return;
+
+    final jsonPayload = jsonEncode(payload);
 
     for (final endpoint in endpoints) {
       try {
@@ -265,13 +292,13 @@ class TrackingService {
         final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
         final request = await client.postUrl(uri);
         request.headers.contentType = ContentType.json;
-        request.write(payload);
+        request.write(jsonPayload);
         final response = await request.close().timeout(const Duration(seconds: 15));
         await response.drain<void>();
         client.close(force: true);
-        await _logEvent('backend_location_sent', 'Location sent to ${uri.host}.');
+        await _logEvent('backend_${dataType}_sent', 'Data ($dataType) sent to ${uri.host}.');
       } catch (error) {
-        await _logEvent('backend_location_error', 'Unable to send to $endpoint: $error');
+        await _logEvent('backend_${dataType}_error', 'Unable to send $dataType to $endpoint: $error');
       }
     }
   }
@@ -429,212 +456,5 @@ class TrackingService {
     );
   }
 
-  static Future<List<Map<String, dynamic>>> getEventLogs() async {
-    return _readJsonArrayFile(_eventLogFileName);
-  }
-
-  static Future<Map<String, dynamic>> getCollectionStats() async {
-    final allData = await getCollectedData();
-    final locationData = allData.where((record) {
-      return record['source_file'] == 'location_data.json' ||
-          record.containsKey('latitude');
-    }).length;
-    final eventData = allData.where((record) => record['event'] != null).length;
-
-    final logsDir = await _logsDirectory(create: false);
-    final files = await logsDir.exists()
-        ? await logsDir
-            .list()
-            .where((entity) => entity is File && entity.path.endsWith('.json'))
-            .length
-        : 0;
-
-    return {
-      'total_records': allData.length,
-      'location_count': locationData,
-      'event_count': eventData,
-      'total_data_files': files,
-      'last_update': DateTime.now().toIso8601String(),
-    };
-  }
-
-  static Future<void> clearAllData() async {
-    final logsDir = await _logsDirectory(create: false);
-    if (await logsDir.exists()) {
-      await logsDir.delete(recursive: true);
-    }
-    await _logEvent('data_cleared', 'Local sharing records were cleared.');
-  }
-
-  static Future<void> _logEvent(String type, String message) async {
-    final logs = await getEventLogs();
-    logs.add({
-      'timestamp': DateTime.now().toUtc().toIso8601String(),
-      'type': type,
-      'message': message,
-    });
-
-    final logsDir = await _logsDirectory();
-    final file = File('${logsDir.path}/$_eventLogFileName');
-    await file.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(logs),
-      flush: true,
-    );
-  }
-
-  static Future<bool> _isAuthorizedAdminRequest(HttpRequest request) async {
-    final providedToken = request.headers.value('x-guardian-token') ??
-        request.uri.queryParameters['token'];
-    return isGuardianAdminTokenValid(providedToken);
-  }
-
-  static String _generateGuardianToken() {
-    final random = Random.secure();
-    final values = List<int>.generate(32, (_) => random.nextInt(256));
-    return base64UrlEncode(values).replaceAll('=', '');
-  }
-
-  static Future<List<Map<String, dynamic>>> _readCollectedRecords({
-    bool Function(Map<String, dynamic> record)? predicate,
-  }) async {
-    final logsDir = await _logsDirectory(create: false);
-    if (!await logsDir.exists()) {
-      return [];
-    }
-
-    final records = <Map<String, dynamic>>[];
-    await for (final entity in logsDir.list()) {
-      if (entity is! File || !entity.path.endsWith('.json')) continue;
-
-      final fileName = _fileName(entity.path);
-      final fileRecords = await _readRecordsFromFile(entity, fileName);
-      records.addAll(
-        predicate == null ? fileRecords : fileRecords.where(predicate),
-      );
-    }
-
-    records.sort(_compareRecordsByTimestampDesc);
-    return records;
-  }
-
-  static Future<List<Map<String, dynamic>>> _readRecordsFromFile(
-    File file,
-    String fileName,
-  ) async {
-    try {
-      final content = await file.readAsString();
-      if (content.trim().isEmpty) return [];
-
-      final decoded = jsonDecode(content);
-      if (decoded is List) {
-        return decoded
-            .whereType<Map>()
-            .map((record) => {
-                  ...record.cast<String, dynamic>(),
-                  'source_file': fileName,
-                })
-            .toList();
-      }
-      if (decoded is Map) {
-        return [
-          {
-            ...decoded.cast<String, dynamic>(),
-            'source_file': fileName,
-          }
-        ];
-      }
-    } catch (_) {
-      return _readJsonLineRecords(file, fileName);
-    }
-
-    return [];
-  }
-
-  static Future<List<Map<String, dynamic>>> _readJsonLineRecords(
-    File file,
-    String fileName,
-  ) async {
-    final records = <Map<String, dynamic>>[];
-    try {
-      final lines = await file.readAsLines();
-      for (final line in lines) {
-        if (line.trim().isEmpty) continue;
-        try {
-          final decoded = jsonDecode(line);
-          if (decoded is Map) {
-            records.add({
-              ...decoded.cast<String, dynamic>(),
-              'source_file': fileName,
-            });
-          }
-        } catch (error) {
-          debugPrint('Skipped invalid JSON in $fileName: $error');
-        }
-      }
-    } catch (error) {
-      debugPrint('Unable to read $fileName: $error');
-    }
-    return records;
-  }
-
-  static Future<List<Map<String, dynamic>>> _readJsonArrayFile(
-    String fileName,
-  ) async {
-    final logsDir = await _logsDirectory(create: false);
-    final file = File('${logsDir.path}/$fileName');
-    if (!await file.exists()) return [];
-
-    try {
-      final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! List) return [];
-      return decoded
-          .whereType<Map>()
-          .map((record) => record.cast<String, dynamic>())
-          .toList()
-        ..sort(_compareRecordsByTimestampDesc);
-    } catch (error) {
-      debugPrint('Unable to read $fileName: $error');
-      return [];
-    }
-  }
-
-  static int _compareRecordsByTimestampDesc(
-    Map<String, dynamic> a,
-    Map<String, dynamic> b,
-  ) {
-    final aTime = DateTime.tryParse(a['timestamp']?.toString() ?? '');
-    final bTime = DateTime.tryParse(b['timestamp']?.toString() ?? '');
-    if (aTime == null && bTime == null) return 0;
-    if (aTime == null) return 1;
-    if (bTime == null) return -1;
-    return bTime.compareTo(aTime);
-  }
-
-  static Future<void> _appendJsonLine(
-    String fileName,
-    Map<String, dynamic> data,
-  ) async {
-    final logsDir = await _logsDirectory();
-    final file = File('${logsDir.path}/$fileName');
-    await file.writeAsString(
-      '${jsonEncode(data)}\n',
-      mode: FileMode.append,
-      flush: true,
-    );
-  }
-
-  static Future<Directory> _logsDirectory({bool create = true}) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final logsDir = Directory('${directory.path}/logs');
-
-    if (create && !await logsDir.exists()) {
-      await logsDir.create(recursive: true);
-    }
-
-    return logsDir;
-  }
-
-  static String _fileName(String path) {
-    return path.split(Platform.pathSeparator).last;
-  }
-}
+  static Future<List<Map<String, dynamic>>> getEventLogs() async {    return _readJsonArrayFile(_eventLogFile
+(Content truncated due to size limit. Use line ranges to read remaining content)
