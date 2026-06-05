@@ -60,11 +60,7 @@ class SafeStorageService {
   static Future<List<SafeStorageItem>> getItems() async {
     final prefs = await SharedPreferences.getInstance();
     final encoded = prefs.getStringList(_itemsKey) ?? const [];
-    return encoded
-        .map((item) => jsonDecode(item))
-        .whereType<Map<String, dynamic>>()
-        .map(SafeStorageItem.fromJson)
-        .toList()
+    return encoded.map(_decodeItem).whereType<SafeStorageItem>().toList()
       ..sort((a, b) => b.updatedTime.compareTo(a.updatedTime));
   }
 
@@ -77,7 +73,7 @@ class SafeStorageService {
       throw StateError('Safe storage consent is required.');
     }
 
-    final encryptedPayload = await _channel.invokeMethod<String>(
+    final encryptedPayload = await _invokeNativeCrypto(
       'encryptSecret',
       {'plaintext': plaintext},
     );
@@ -105,7 +101,7 @@ class SafeStorageService {
       throw StateError('Safe storage consent is required.');
     }
 
-    final plaintext = await _channel.invokeMethod<String>(
+    final plaintext = await _invokeNativeCrypto(
       'decryptSecret',
       {'payload': item.encryptedPayload},
     );
@@ -127,5 +123,30 @@ class SafeStorageService {
       _itemsKey,
       items.map((item) => jsonEncode(item.toJson())).toList(),
     );
+  }
+
+  static SafeStorageItem? _decodeItem(String encoded) {
+    try {
+      final decoded = jsonDecode(encoded);
+      if (decoded is Map) {
+        return SafeStorageItem.fromJson(decoded.cast<String, dynamic>());
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  static Future<String?> _invokeNativeCrypto(
+    String method,
+    Map<String, Object?> arguments,
+  ) async {
+    try {
+      return _channel.invokeMethod<String>(method, arguments);
+    } on PlatformException catch (error) {
+      throw StateError(
+        '${error.code}: ${error.message ?? 'Native safe-storage operation failed.'}',
+      );
+    }
   }
 }

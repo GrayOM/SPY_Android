@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -17,7 +18,9 @@ class TrackingService {
   static const _locationConsentKey = 'location_sharing_consent';
   static const _backendEndpointsKey = 'guardian_backend_endpoints';
   static const _guardianPortKey = 'guardian_admin_port';
+  static const _guardianAdminTokenKey = 'guardian_admin_token';
   static const _latestLocationKey = 'latest_location_sample';
+  static const _eventLogFileName = 'logs.json';
   static const Map<String, int> collectionIntervals = {
     'location': 15,
   };
@@ -97,6 +100,31 @@ class TrackingService {
   static Future<bool> hasLocationConsent() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_locationConsentKey) ?? false;
+  }
+
+  static Future<String> getGuardianAdminToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(_guardianAdminTokenKey);
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+
+    final token = _generateGuardianToken();
+    await prefs.setString(_guardianAdminTokenKey, token);
+    return token;
+  }
+
+  static Future<String> rotateGuardianAdminToken() async {
+    final token = _generateGuardianToken();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_guardianAdminTokenKey, token);
+    await _logEvent('guardian_admin_token_rotated', 'Guardian admin token was rotated.');
+    return token;
+  }
+
+  static Future<bool> isGuardianAdminTokenValid(String? token) async {
+    if (token == null || token.isEmpty) return false;
+    return token == await getGuardianAdminToken();
   }
 
   static Future<void> forceLocationShare() async {
@@ -253,6 +281,7 @@ class TrackingService {
 
     try {
       final prefs = await SharedPreferences.getInstance();
+      await getGuardianAdminToken();
       final preferredPort = prefs.getInt(_guardianPortKey) ?? 8787;
       _adminServer = await HttpServer.bind(
         InternetAddress.anyIPv4,
@@ -273,6 +302,14 @@ class TrackingService {
 
     await for (final request in server) {
       try {
+        if (!await _isAuthorizedAdminRequest(request)) {
+          request.response
+            ..statusCode = HttpStatus.unauthorized
+            ..headers.contentType = ContentType.text
+            ..write('Unauthorized');
+          continue;
+        }
+
         final latest = await getLatestLocation();
         final safeItems = await _readSafeItemMetadata();
         final html = _buildGuardianHtml(latest, safeItems);
@@ -292,10 +329,18 @@ class TrackingService {
   static Future<List<Map<String, dynamic>>> _readSafeItemMetadata() async {
     final prefs = await SharedPreferences.getInstance();
     final encoded = prefs.getStringList('safe_storage_items') ?? const [];
-    return encoded
-        .map((item) => jsonDecode(item))
-        .whereType<Map<String, dynamic>>()
-        .toList();
+    final items = <Map<String, dynamic>>[];
+    for (final item in encoded) {
+      try {
+        final decoded = jsonDecode(item);
+        if (decoded is Map) {
+          items.add(decoded.cast<String, dynamic>());
+        }
+      } catch (error) {
+        debugPrint('Skipped invalid safe-storage metadata: $error');
+      }
+    }
+    return items;
   }
 
   static String _buildGuardianHtml(
@@ -362,58 +407,30 @@ class TrackingService {
   }
 
   static Future<List<Map<String, dynamic>>> getCollectedData() async {
-    final logsDir = await _logsDirectory(create: false);
-    if (!await logsDir.exists()) {
-      return [];
-    }
-
-    final records = <Map<String, dynamic>>[];
-    await for (final entity in logsDir.list()) {
-      if (entity is! File || !entity.path.endsWith('.json')) continue;
-
-      final fileName = _fileName(entity.path);
-      try {
-        final lines = await entity.readAsLines();
-        for (final line in lines) {
-          if (line.trim().isEmpty) continue;
-
-          try {
-            final decoded = jsonDecode(line);
-            if (decoded is Map<String, dynamic>) {
-              records.add({...decoded, 'source_file': fileName});
-            }
-          } catch (_) {
-            await _logEvent('parse_error', 'Skipped invalid JSON in $fileName.');
-          }
-        }
-      } catch (error) {
-        await _logEvent('read_error', 'Unable to read $fileName: $error');
-      }
-    }
-
-    records.sort((a, b) {
-      final aTime = DateTime.tryParse(a['timestamp']?.toString() ?? '');
-      final bTime = DateTime.tryParse(b['timestamp']?.toString() ?? '');
-      if (aTime == null && bTime == null) return 0;
-      if (aTime == null) return 1;
-      if (bTime == null) return -1;
-      return bTime.compareTo(aTime);
-    });
-
-    return records;
+    return _readCollectedRecords();
   }
 
   static Future<List<Map<String, dynamic>>> getLocationData() async {
-    final data = await getCollectedData();
-    return data.where((record) {
-      return record['source_file'] == 'location_data.json' ||
-          record.containsKey('latitude');
-    }).toList();
+    return _readCollectedRecords(
+      predicate: (record) {
+        return record['source_file'] == 'location_data.json' ||
+            record.containsKey('latitude');
+      },
+    );
   }
 
   static Future<List<Map<String, dynamic>>> getEventData() async {
-    final data = await getCollectedData();
-    return data.where((record) => record['event'] != null).toList();
+    return _readCollectedRecords(
+      predicate: (record) =>
+          record['source_file'] == _eventLogFileName ||
+          record['source_file'] == 'service_events.json' ||
+          record['event'] != null ||
+          record['type'] != null,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getEventLogs() async {
+    return _readJsonArrayFile(_eventLogFileName);
   }
 
   static Future<Map<String, dynamic>> getCollectionStats() async {
@@ -449,13 +466,148 @@ class TrackingService {
     await _logEvent('data_cleared', 'Local sharing records were cleared.');
   }
 
-  static Future<void> _logEvent(String event, String details) {
-    return _appendJsonLine('service_events.json', {
-      'event': event,
-      'details': details,
-      'timestamp': DateTime.now().toIso8601String(),
-      'service': 'TrackingService',
+  static Future<void> _logEvent(String type, String message) async {
+    final logs = await getEventLogs();
+    logs.add({
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
+      'type': type,
+      'message': message,
     });
+
+    final logsDir = await _logsDirectory();
+    final file = File('${logsDir.path}/$_eventLogFileName');
+    await file.writeAsString(
+      const JsonEncoder.withIndent('  ').convert(logs),
+      flush: true,
+    );
+  }
+
+  static Future<bool> _isAuthorizedAdminRequest(HttpRequest request) async {
+    final providedToken = request.headers.value('x-guardian-token') ??
+        request.uri.queryParameters['token'];
+    return isGuardianAdminTokenValid(providedToken);
+  }
+
+  static String _generateGuardianToken() {
+    final random = Random.secure();
+    final values = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64UrlEncode(values).replaceAll('=', '');
+  }
+
+  static Future<List<Map<String, dynamic>>> _readCollectedRecords({
+    bool Function(Map<String, dynamic> record)? predicate,
+  }) async {
+    final logsDir = await _logsDirectory(create: false);
+    if (!await logsDir.exists()) {
+      return [];
+    }
+
+    final records = <Map<String, dynamic>>[];
+    await for (final entity in logsDir.list()) {
+      if (entity is! File || !entity.path.endsWith('.json')) continue;
+
+      final fileName = _fileName(entity.path);
+      final fileRecords = await _readRecordsFromFile(entity, fileName);
+      records.addAll(
+        predicate == null ? fileRecords : fileRecords.where(predicate),
+      );
+    }
+
+    records.sort(_compareRecordsByTimestampDesc);
+    return records;
+  }
+
+  static Future<List<Map<String, dynamic>>> _readRecordsFromFile(
+    File file,
+    String fileName,
+  ) async {
+    try {
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) return [];
+
+      final decoded = jsonDecode(content);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map((record) => {
+                  ...record.cast<String, dynamic>(),
+                  'source_file': fileName,
+                })
+            .toList();
+      }
+      if (decoded is Map) {
+        return [
+          {
+            ...decoded.cast<String, dynamic>(),
+            'source_file': fileName,
+          }
+        ];
+      }
+    } catch (_) {
+      return _readJsonLineRecords(file, fileName);
+    }
+
+    return [];
+  }
+
+  static Future<List<Map<String, dynamic>>> _readJsonLineRecords(
+    File file,
+    String fileName,
+  ) async {
+    final records = <Map<String, dynamic>>[];
+    try {
+      final lines = await file.readAsLines();
+      for (final line in lines) {
+        if (line.trim().isEmpty) continue;
+        try {
+          final decoded = jsonDecode(line);
+          if (decoded is Map) {
+            records.add({
+              ...decoded.cast<String, dynamic>(),
+              'source_file': fileName,
+            });
+          }
+        } catch (error) {
+          debugPrint('Skipped invalid JSON in $fileName: $error');
+        }
+      }
+    } catch (error) {
+      debugPrint('Unable to read $fileName: $error');
+    }
+    return records;
+  }
+
+  static Future<List<Map<String, dynamic>>> _readJsonArrayFile(
+    String fileName,
+  ) async {
+    final logsDir = await _logsDirectory(create: false);
+    final file = File('${logsDir.path}/$fileName');
+    if (!await file.exists()) return [];
+
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! List) return [];
+      return decoded
+          .whereType<Map>()
+          .map((record) => record.cast<String, dynamic>())
+          .toList()
+        ..sort(_compareRecordsByTimestampDesc);
+    } catch (error) {
+      debugPrint('Unable to read $fileName: $error');
+      return [];
+    }
+  }
+
+  static int _compareRecordsByTimestampDesc(
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+  ) {
+    final aTime = DateTime.tryParse(a['timestamp']?.toString() ?? '');
+    final bTime = DateTime.tryParse(b['timestamp']?.toString() ?? '');
+    if (aTime == null && bTime == null) return 0;
+    if (aTime == null) return 1;
+    if (bTime == null) return -1;
+    return bTime.compareTo(aTime);
   }
 
   static Future<void> _appendJsonLine(
