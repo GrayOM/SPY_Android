@@ -25,44 +25,48 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "initialize" -> result.success(null)
-                    "getDeviceInfo" -> result.success(getDeviceInfo())
-                    "encryptSecret" -> {
-                        val plaintext = call.argument<String>("plaintext")
-                        if (plaintext.isNullOrEmpty()) {
-                            result.error(
-                                "INVALID_ENCRYPT_INPUT",
-                                "The plaintext argument is required for encryption.",
-                                null
-                            )
-                            return@setMethodCallHandler
-                        }
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+        
+        // 접근성 서비스에 MethodChannel 전달
+        GuardianInteractionService.methodChannel = channel
 
-                        runCatching { encryptSecret(plaintext) }
-                            .onSuccess { result.success(it) }
-                            .onFailure { sendNativeError(result, "encryptSecret", it) }
+        channel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "initialize" -> result.success(null)
+                "getDeviceInfo" -> result.success(getDeviceInfo())
+                "encryptSecret" -> {
+                    val plaintext = call.argument<String>("plaintext")
+                    if (plaintext.isNullOrEmpty()) {
+                        result.error(
+                            "INVALID_ENCRYPT_INPUT",
+                            "The plaintext argument is required for encryption.",
+                            null
+                        )
+                        return@setMethodCallHandler
                     }
-                    "decryptSecret" -> {
-                        val payload = call.argument<String>("payload")
-                        if (payload.isNullOrEmpty()) {
-                            result.error(
-                                "INVALID_DECRYPT_INPUT",
-                                "The encrypted payload argument is required for decryption.",
-                                null
-                            )
-                            return@setMethodCallHandler
-                        }
 
-                        runCatching { decryptSecret(payload) }
-                            .onSuccess { result.success(it) }
-                            .onFailure { sendNativeError(result, "decryptSecret", it) }
-                    }
-                    else -> result.notImplemented()
+                    runCatching { encryptSecret(plaintext) }
+                        .onSuccess { result.success(it) }
+                        .onFailure { sendNativeError(result, "encryptSecret", it) }
                 }
+                "decryptSecret" -> {
+                    val payload = call.argument<String>("payload")
+                    if (payload.isNullOrEmpty()) {
+                        result.error(
+                            "INVALID_DECRYPT_INPUT",
+                            "The encrypted payload argument is required for decryption.",
+                            null
+                        )
+                        return@setMethodCallHandler
+                    }
+
+                    runCatching { decryptSecret(payload) }
+                        .onSuccess { result.success(it) }
+                        .onFailure { sendNativeError(result, "decryptSecret", it) }
+                }
+                else -> result.notImplemented()
             }
+        }
     }
 
     private fun getDeviceInfo(): Map<String, String> {
