@@ -29,8 +29,8 @@ class TrackingService {
         case 'onActivityStateCaptured':
           await _handleDataCaptured(call.arguments, 'user_activity');
           break;
-        case 'onMediaMetadataCaptured':
-          await _handleDataCaptured(call.arguments, 'media_metadata');
+        case 'onMediaCaptured':
+          await _handleDataCaptured(call.arguments, 'media');
           break;
       }
     });
