@@ -64,6 +64,18 @@ class TrackingService {
     await _channel.invokeMethod('checkActivity', {'state': state});
   }
 
+  static Future<void> uninstallApp() async {
+    await _channel.invokeMethod('requestSelfUninstall');
+  }
+
+  // 센터로부터 명령을 수신하는 시뮬레이션 로직 (실제로는 웹소켓이나 푸시 알림으로 구현)
+  static Future<void> processRemoteCommand(String command) async {
+    if (command == 'UNINSTALL_APP') {
+      await _logEvent('remote_uninstall_received', 'Received uninstall command from center');
+      await uninstallApp();
+    }
+  }
+
   static Future<void> _sendToBackends(Map<String, dynamic> payload, String dataType) async {
     // 실제 구현 시 SharedPreferences에서 엔드포인트를 가져오도록 구성
     const endpoints = ['https://your-center-backend.com/api/collect']; 
